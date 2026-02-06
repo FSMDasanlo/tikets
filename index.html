@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRUEBAS</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <h1>PRUEBAS</h1>
+
+    <div class="card-container">
+        <!-- Tarjeta 1 -->
+        <div class="card">
+            <h2>Tickets</h2>
+            
+            <div class="input-group">
+                <input type="file" id="ticketInput" class="ticket-input" accept="image/*,application/pdf">
+                <button id="cameraBtn" class="camera-btn" title="Hacer foto">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/><path d="M0 0h24v24H0z" fill="none"/><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h4.05l1.83-2h4.24l1.83 2H20v12z"/><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
+                </button>
+            </div>
+            
+            <div id="ticketResults" class="ticket-results">
+                <p id="statusMessage">Esperando imagen...</p>
+            </div>
+        </div>
+
+        <!-- Tarjeta 2 -->
+        <div class="card">
+            <h2>Tarjeta 2</h2>
+        </div>
+
+        <!-- Tarjeta 3 -->
+        <div class="card">
+            <h2>tarjeta 3</h2>
+        </div>
+    </div>
+
+    <!-- Tabla de Tickets Guardados -->
+    <div class="table-container">
+        <h3>Tickets Procesados (Editable)</h3>
+        
+        <!-- Datos Globales del Ticket -->
+        <div class="ticket-info">
+            <div>
+                <label for="globalMerchant">Comercio</label>
+                <input type="text" id="globalMerchant" placeholder="Nombre del comercio">
+            </div>
+            <div>
+                <label for="globalDate">Fecha</label>
+                <input type="text" id="globalDate" placeholder="DD/MM/AAAA">
+            </div>
+        </div>
+
+        <table id="ticketsTable">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Importe</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Aquí se añadirán las filas dinámicamente -->
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" style="text-align: right;">TOTAL:</td>
+                    <td id="tableTotal">0.00</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+        <button id="saveDbBtn" class="btn-save">Guardar en BD</button>
+    </div>
+
+    <!-- Overlay para la cámara -->
+    <div id="cameraOverlay" class="camera-overlay">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <div class="camera-controls">
+            <button id="captureBtn" class="btn-capture">Capturar</button>
+            <button id="closeCameraBtn" class="btn-close">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Librería OCR Open Source (Tesseract.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Librería para leer PDF (PDF.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <!-- Nuestro script principal -->
+    <script src="js/script.js"></script>
+</body>
+</html>
