@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultas y Gestión</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Consultas y Gestión</h1>
+    
+    <!-- Botón para volver -->
+    <div style="width: 100%; max-width: 1200px; margin-bottom: 10px;">
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
+        <button id="btnViewTotal" class="btn-save" style="width: auto; background-color: #17a2b8; margin-left: 10px;">Solo Total</button>
+        <button id="btnViewDetail" class="btn-save" style="width: auto; background-color: #007bff; margin-left: 5px;">Detalle</button>
+    </div>
+
+    <div class="card-container" style="flex-direction: column; align-items: center;">
+        <!-- Filtros -->
+        <div class="card" style="width: 100%; max-width: 1000px; cursor: default; transform: none; padding: 20px;">
+            <h2 style="margin-bottom: 20px;">Filtros de Búsqueda</h2>
+            <div class="filters-container">
+                <div class="filter-group">
+                    <label>Nivel 0</label>
+                    <select id="filterLevel0">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Comercio</label>
+                    <select id="filterMerchant">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Categoría</label>
+                    <select id="filterCategory">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Desde</label>
+                    <input type="date" id="filterDateStart">
+                </div>
+                <div class="filter-group">
+                    <label>Hasta</label>
+                    <input type="date" id="filterDateEnd">
+                </div>
+                <button id="searchBtn" class="camera-btn" style="border-radius: 5px; width: auto; padding: 0 20px; height: 38px; margin-top: 18px;">
+                    Buscar
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla Resultados -->
+        <div class="table-container" style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Resultados</h3>
+                <span id="totalResults" style="font-weight: bold; font-size: 1.2rem; color: #007bff;">Total: 0.00 €</span>
+            </div>
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Nivel 0</th>
+                        <th>Comercio</th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th>Importe</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Se rellena con JS -->
+                </tbody>
+                <tfoot>
+                    <!-- Se rellena con JS (Total Global) -->
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- Resumen Estadístico -->
+    <div class="card-container" style="margin-top: 20px; justify-content: center; gap: 20px;">
+        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+            <h3 style="margin: 0; font-size: 1rem; color: #555;">Gasto Máximo</h3>
+            <p id="statMax" style="font-size: 1.5rem; font-weight: bold; color: #dc3545; margin: 10px 0 0;">0.00 €</p>
+        </div>
+        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+            <h3 style="margin: 0; font-size: 1rem; color: #555;">Gasto Medio</h3>
+            <p id="statAvg" style="font-size: 1.5rem; font-weight: bold; color: #ffc107; margin: 10px 0 0;">0.00 €</p>
+        </div>
+        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+            <h3 style="margin: 0; font-size: 1rem; color: #555;">Nº Tickets</h3>
+            <p id="statCount" style="font-size: 1.5rem; font-weight: bold; color: #17a2b8; margin: 10px 0 0;">0</p>
+        </div>
+    </div>
+
+    <!-- Gráfico de Gastos -->
+    <div class="card-container" style="margin-top: 20px; margin-bottom: 40px; justify-content: center;">
+        <div class="card" style="width: 100%; max-width: 500px; cursor: default; transform: none; padding: 20px; height: 400px;">
+            <canvas id="expenseChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Modal Edición -->
+    <div id="editModalOverlay" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Editar Gasto</h2>
+            <input type="hidden" id="editId"> <!-- ID oculto de Firestore -->
+            <div class="form-group">
+                <label>Nivel 0</label>
+                <select id="editLevel0">
+                    <option>Cargando...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Comercio</label>
+                <input type="text" id="editMerchant">
+            </div>
+            <div class="form-group">
+                <label>Fecha</label>
+                <input type="date" id="editDate">
+            </div>
+            <div class="form-group">
+                <label>Producto</label>
+                <input type="text" id="editProduct">
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <select id="editCategory">
+                    <option>Cargando...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Importe (€)</label>
+                <input type="number" id="editAmount" step="0.01">
+            </div>
+            <div class="modal-actions">
+                <button id="saveEditBtn" class="btn-save">Guardar Cambios</button>
+                <button id="closeEditBtn" class="btn-close">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/consultas.js"></script>
+</body>
+</html>

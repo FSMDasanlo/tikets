@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tikets y Recibos</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <h1>Tikets y Recibos</h1>
+
+    <!-- Botón para volver -->
+    <div style="width: 100%; max-width: 1200px; margin-bottom: 10px;">
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
+    </div>
+
+    <div class="card-container">
+        <!-- Tarjeta 1: Subir Archivo -->
+        <div class="card">
+            <h2>Subir Archivo</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <label for="ticketInput" class="btn-save" style="display: block; margin-top: 10px; text-align: center;">Seleccionar Archivo</label>
+            <input type="file" id="ticketInput" style="display: none;" accept="image/*,application/pdf">
+        </div>
+
+        <!-- Tarjeta 2: Cámara -->
+        <div class="card">
+            <h2>Usar Cámara</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            <button id="cameraBtn" class="btn-save" style="margin-top: 10px;">Abrir Cámara</button>
+        </div>
+
+        <!-- Tarjeta 3: Recibo Manual -->
+        <div class="card" id="manualEntryCard">
+            <h2>Recibo Manual</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <button class="btn-save" style="margin-top: 10px;">Crear Manual</button>
+        </div>
+    </div>
+
+    <!-- Área de Estado (Movida fuera de las tarjetas) -->
+    <div id="ticketResults" class="ticket-results">
+        <p id="statusMessage" style="font-size: 1.1rem; color: #007bff; margin: 0;">Esperando imagen...</p>
+    </div>
+
+    <!-- Tabla de Tickets Guardados -->
+    <div class="table-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Tickets Procesados (Editable)</h3>
+            <button id="clearTableBtn" class="btn-close" style="padding: 8px 15px; font-size: 0.9rem;">Eliminar Todo</button>
+        </div>
+        
+        <!-- Datos Globales del Ticket -->
+        <div class="ticket-info level-madrid">
+            <div>
+                <label for="globalLevel0">Nivel 0</label>
+                <select id="globalLevel0">
+                    <option>Cargando...</option>
+                </select>
+            </div>
+            <div>
+                <label for="globalMerchant">Comercio</label>
+                <input type="text" id="globalMerchant" placeholder="Nombre del comercio">
+            </div>
+            <div>
+                <label for="globalDate">Fecha</label>
+                <input type="date" id="globalDate">
+            </div>
+        </div>
+
+        <table id="ticketsTable">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Importe</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Aquí se añadirán las filas dinámicamente -->
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2" style="text-align: right;">TOTAL:</td>
+                    <td id="tableTotal">0.00</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+        <button id="saveDbBtn" class="btn-save">Guardar en BD</button>
+    </div>
+
+    <!-- Overlay para la cámara -->
+    <div id="cameraOverlay" class="camera-overlay">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <div class="camera-controls">
+            <button id="captureBtn" class="btn-capture">Capturar</button>
+            <button id="closeCameraBtn" class="btn-close">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Modal para Entrada Manual -->
+    <div id="manualEntryOverlay" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Nuevo Recibo Manual</h2>
+            <div class="form-group">
+                <label for="manualMerchant">Comercio</label>
+                <input type="text" id="manualMerchant" placeholder="Ej: Mercadona">
+            </div>
+            <div class="form-group">
+                <label for="manualDate">Fecha</label>
+                <input type="date" id="manualDate">
+            </div>
+            <div class="form-group">
+                <label for="manualProduct">Producto</label>
+                <input type="text" id="manualProduct" placeholder="Ej: Pan">
+            </div>
+            <div class="form-group">
+                <label for="manualCategory">Categoría</label>
+                <select id="manualCategory">
+                    <option>Cargando...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="manualAmount">Importe (€)</label>
+                <input type="number" id="manualAmount" step="0.01" placeholder="0.00">
+            </div>
+            <div class="modal-actions">
+                <button id="transferManualBtn" class="btn-save">Añadir a Tabla</button>
+                <button id="closeManualBtn" class="btn-close">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Librerías y Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script type="module" src="js/script.js"></script>
+</body>
+</html>

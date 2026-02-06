@@ -1,3 +1,22 @@
+// --- CONFIGURACIÓN DE FIREBASE ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ⚠️
+const firebaseConfig = {
+  apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
+  authDomain: "tikets-e8747.firebaseapp.com",
+  projectId: "tikets-e8747",
+  storageBucket: "tikets-e8747.firebasestorage.app",
+  messagingSenderId: "1011614009578",
+  appId: "1:1011614009578:web:b18505cbd4b98e7a6d2f93",
+  measurementId: "G-Z3HSTEH6JN"
+};
+
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 // Configuración del worker de PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -11,26 +30,102 @@ const ticketResults = document.getElementById('ticketResults');
 const statusMessage = document.getElementById('statusMessage');
 const ticketsTableBody = document.querySelector('#ticketsTable tbody');
 const tableTotalSpan = document.getElementById('tableTotal');
+const clearTableBtn = document.getElementById('clearTableBtn');
 const saveDbBtn = document.getElementById('saveDbBtn');
 const globalMerchantInput = document.getElementById('globalMerchant');
+const globalLevel0Input = document.getElementById('globalLevel0');
 const globalDateInput = document.getElementById('globalDate');
+const ticketInfoDiv = document.querySelector('.ticket-info');
+
+// Elementos del modal manual
+const manualEntryCard = document.getElementById('manualEntryCard');
+const manualEntryOverlay = document.getElementById('manualEntryOverlay');
+const closeManualBtn = document.getElementById('closeManualBtn');
+const transferManualBtn = document.getElementById('transferManualBtn');
+// Inputs manuales
+const manualMerchant = document.getElementById('manualMerchant');
+const manualDate = document.getElementById('manualDate');
+const manualProduct = document.getElementById('manualProduct');
+const manualCategory = document.getElementById('manualCategory');
+const manualAmount = document.getElementById('manualAmount');
+
+let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros", "Otros"]; // Fallback por defecto
+
+// Función para cargar configuración desde Firebase
+async function loadConfig() {
+    try {
+        // Cargar Niveles
+        const levelsSnap = await getDocs(collection(db, "levels"));
+        const levelSelect = document.getElementById('globalLevel0');
+        
+        if (!levelsSnap.empty) {
+            levelSelect.innerHTML = '';
+            levelsSnap.forEach(doc => {
+                const opt = document.createElement('option');
+                opt.value = doc.data().name;
+                opt.textContent = doc.data().name;
+                if(doc.data().name === 'MADRID') opt.selected = true;
+                levelSelect.appendChild(opt);
+            });
+        }
+
+        // Cargar Categorías
+        const catsSnap = await getDocs(collection(db, "categories"));
+        const manualCatSelect = document.getElementById('manualCategory');
+        
+        if (!catsSnap.empty) {
+            manualCatSelect.innerHTML = '';
+            globalCategories = [];
+            catsSnap.forEach(doc => {
+                const name = doc.data().name;
+                globalCategories.push(name);
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                manualCatSelect.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        console.error("Error cargando configuración:", e);
+    }
+}
 
 // Función para limpiar la tabla y los datos
 function clearTable() {
     ticketsTableBody.innerHTML = '';
     globalMerchantInput.value = '';
+    globalLevel0Input.value = 'MADRID'; // Restablecer valor por defecto
     globalDateInput.value = '';
     tableTotalSpan.textContent = '0.00 €';
     statusMessage.textContent = 'Esperando imagen...';
     statusMessage.style.color = '#333';
+
+    // Restablecer color de cabecera
+    ticketInfoDiv.classList.remove('level-almenara', 'level-global');
+    ticketInfoDiv.classList.add('level-madrid');
 }
 
+// Evento para el botón de Eliminar Todo
+clearTableBtn.addEventListener('click', () => {
+    if (ticketsTableBody.children.length > 0 && confirm("¿Estás seguro de que quieres borrar todos los datos de la tabla?")) {
+        clearTable();
+    }
+});
+
+// Evento para cambiar el color de la cabecera según el Nivel 0
+globalLevel0Input.addEventListener('change', () => {
+    ticketInfoDiv.classList.remove('level-madrid', 'level-almenara', 'level-global');
+    const selectedLevel = globalLevel0Input.value.toLowerCase();
+    ticketInfoDiv.classList.add(`level-${selectedLevel}`);
+});
+
 // Función para guardar datos (Simulación BD)
-function saveDataToDb() {
+async function saveDataToDb() {
     const rows = document.querySelectorAll('#ticketsTable tbody tr');
     if (rows.length === 0) return;
 
     const merchant = globalMerchantInput.value.trim();
+    const level0 = globalLevel0Input.value;
     const date = globalDateInput.value.trim();
 
     if (!merchant || !date) {
@@ -39,23 +134,88 @@ function saveDataToDb() {
     }
 
     const dataToSave = [];
+    let currentTotal = 0;
 
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const categorySelect = row.querySelector('.category-select');
+        const amountText = cells[2].innerText;
+        // Convertir a número para cálculos y almacenamiento consistente
+        const amountVal = parseFloat(amountText.replace(',', '.').replace('€', '')) || 0;
+        
+        currentTotal += amountVal;
+
         dataToSave.push({
+            level0: level0,
             merchant: merchant,
             date: date,
             product: cells[0].innerText,
             category: categorySelect.value,
-            amount: cells[2].innerText
+            amount: amountVal // Guardamos como número
         });
     });
 
-    console.log("Guardando en BD:", dataToSave);
-    alert(`Se han guardado ${dataToSave.length} registros en la base de datos.`);
-    
-    clearTable();
+    // --- Comprobación de duplicados en FIRESTORE ---
+    try {
+        // Consultamos si ya existen gastos con ese comercio y fecha
+        const q = query(
+            collection(db, "expenses"), 
+            where("merchant", "==", merchant), 
+            where("date", "==", date)
+        );
+        
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            // Calculamos el total de los documentos encontrados
+            let storedTotal = 0;
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                storedTotal += (parseFloat(data.amount) || 0);
+            });
+            
+            // Si el total coincide (con margen de error), avisamos
+            if (Math.abs(storedTotal - currentTotal) < 0.05) {
+                const confirmSave = confirm(
+                    `⚠️ POSIBLE DUPLICADO DETECTADO EN LA NUBE ⚠️\n\n` +
+                    `Ya tienes guardados datos para:\n` +
+                    `Comercio: ${merchant}\n` +
+                    `Fecha: ${date}\n` +
+                    `Importe Total: ${storedTotal.toFixed(2)} €\n\n` +
+                    `¿Estás seguro de que quieres guardarlo de nuevo?`
+                );
+                
+                if (!confirmSave) {
+                    return; // Cancelamos la operación
+                }
+            }
+        }
+
+        // --- Guardar en FIRESTORE (Batch) ---
+        // Usamos un batch para guardar todas las filas de una sola vez
+        const batch = writeBatch(db);
+        
+        dataToSave.forEach(item => {
+            // Creamos una referencia a un nuevo documento con ID automático
+            const docRef = doc(collection(db, "expenses"));
+            batch.set(docRef, item);
+        });
+
+        await batch.commit();
+
+        console.log("Guardado en Firestore:", dataToSave);
+        alert(`✅ Se han guardado ${dataToSave.length} registros en la nube correctamente.`);
+        
+        clearTable();
+
+    } catch (error) {
+        console.error("Error al guardar en Firestore:", error);
+        if (error.code === 'permission-denied') {
+            alert("❌ PERMISO DENEGADO: Las reglas de seguridad de Firebase están bloqueando el acceso. \n\nVe a la consola de Firebase > Firestore > Reglas y cambia 'if false' por 'if true'.");
+        } else {
+            alert("❌ Error al guardar en la base de datos. Revisa la consola para más detalles.");
+        }
+    }
 }
 
 async function processFile(file) {
@@ -66,7 +226,7 @@ async function processFile(file) {
         const wantToSave = confirm("Hay datos de un ticket anterior sin guardar.\n\n¿Quieres GUARDARLOS antes de procesar el nuevo?\n\n[Aceptar] = Guardar y continuar\n[Cancelar] = No guardar (Borrar) y continuar");
         
         if (wantToSave) {
-            saveDataToDb();
+            await saveDataToDb(); // Esperamos a que se guarde en la nube
         } else {
             clearTable();
         }
@@ -83,13 +243,15 @@ async function processFile(file) {
         let imageToProcess = file;
 
         // Si es PDF, lo convertimos a imagen (primera página)
-        if (file.type === 'application/pdf') {
+        // Comprobamos tipo MIME o extensión para mayor seguridad
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
             const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            // Usamos Uint8Array y formato objeto para evitar errores en versiones nuevas de PDF.js
+            const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
             const page = await pdf.getPage(1); // Solo leemos la página 1
             
-            // Renderizamos a alta calidad (escala 2) para que el OCR lea bien
-            const viewport = page.getViewport({ scale: 2.0 }); 
+            // Renderizamos a MAYOR calidad (escala 3) para que el OCR lea mejor los textos pequeños
+            const viewport = page.getViewport({ scale: 3.0 }); 
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -112,11 +274,20 @@ async function processFile(file) {
         // 3. Lógica simple para buscar patrones (Regex)
         // Buscar fecha (dd/mm/yyyy o dd-mm-yyyy)
         const dateMatch = text.match(/(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/);
-        const dateFound = dateMatch ? dateMatch[0] : "No detectada";
+        let dateFound = "";
+        
+        if (dateMatch) {
+            // Convertir formato DD/MM/YYYY a YYYY-MM-DD para el input type="date"
+            const [day, month, year] = dateMatch[0].split(/[-/]/);
+            // Asegurar año de 4 dígitos y ceros a la izquierda
+            const fullYear = year.length === 2 ? '20' + year : year;
+            dateFound = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
 
         // Buscar líneas que parezcan items (Texto ... Precio)
         const lines = text.split('\n');
-        const priceRegex = /(\d+[.,]\d{2})\s*€?/; // Busca números con decimales
+        // Regex mejorada: permite espacios entre enteros y decimales (ej: 12, 50) típicos del OCR
+        const priceRegex = /(\d+[\.,]\s?\d{2})\s*€?/; 
 
         const merchantFound = lines[0] || "No detectado";
 
@@ -129,8 +300,9 @@ async function processFile(file) {
             // Si la línea tiene un precio y texto largo, probablemente es un item
             if (priceRegex.test(line) && line.length > 5) {
                 const priceMatch = line.match(priceRegex);
-                const price = priceMatch[0];
-                const desc = line.replace(price, '').replace('€', '').trim();
+                // Limpiamos espacios dentro del precio para que sea un número válido (ej: "12, 50" -> "12,50")
+                const price = priceMatch[0].replace(/\s/g, '');
+                const desc = line.replace(priceMatch[0], '').replace('€', '').trim();
                 
                 // Añadimos directamente a la tabla
                 addTableRow(desc, price);
@@ -220,22 +392,23 @@ function guessCategory(productName) {
 }
 
 // Función para añadir fila a la tabla
-function addTableRow(product, price) {
+function addTableRow(product, price, category = null) {
     const row = document.createElement('tr');
     
-    // Intentamos adivinar la categoría
-    const guessedCategory = guessCategory(product);
+    // Usamos la categoría pasada o intentamos adivinarla
+    const selectedCategory = category || guessCategory(product);
+    
+    let optionsHtml = '';
+    globalCategories.forEach(cat => {
+        optionsHtml += `<option value="${cat}" ${selectedCategory === cat ? 'selected' : ''}>${cat}</option>`;
+    });
 
     // Celdas editables
     row.innerHTML = `
         <td contenteditable="true">${product}</td>
         <td>
             <select class="category-select">
-                <option value="Alimentación" ${guessedCategory === 'Alimentación' ? 'selected' : ''}>Alimentación</option>
-                <option value="Ropa" ${guessedCategory === 'Ropa' ? 'selected' : ''}>Ropa</option>
-                <option value="Ocio" ${guessedCategory === 'Ocio' ? 'selected' : ''}>Ocio</option>
-                <option value="Comunidades" ${guessedCategory === 'Comunidades' ? 'selected' : ''}>Comunidades</option>
-                <option value="Seguros" ${guessedCategory === 'Seguros' ? 'selected' : ''}>Seguros</option>
+                ${optionsHtml}
             </select>
         </td>
         <td contenteditable="true" class="price-cell">${price}</td>
@@ -245,6 +418,17 @@ function addTableRow(product, price) {
     // Añadir evento para borrar la fila y recalcular
     row.querySelector('.btn-close').addEventListener('click', () => {
         row.remove();
+        updateTableTotal();
+    });
+
+    // Formatear importe al perder el foco (añadir € si falta)
+    const priceCell = row.querySelector('.price-cell');
+    priceCell.addEventListener('blur', () => {
+        const text = priceCell.innerText.trim();
+        // Si hay texto, no tiene el símbolo € y parece un número válido, lo añadimos
+        if (text && !text.includes('€') && !isNaN(parseFloat(text.replace(',', '.').replace('€', '')))) {
+            priceCell.innerText = text + ' €';
+        }
         updateTableTotal();
     });
 
@@ -272,3 +456,46 @@ ticketsTableBody.addEventListener('input', (e) => {
 
 // Funcionalidad del botón Guardar en BD (Simulado)
 saveDbBtn.addEventListener('click', saveDataToDb);
+
+// --- Lógica para Recibo Manual ---
+
+manualEntryCard.addEventListener('click', () => {
+    manualEntryOverlay.style.display = 'flex';
+    // Poner fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    manualDate.value = today;
+});
+
+closeManualBtn.addEventListener('click', () => {
+    manualEntryOverlay.style.display = 'none';
+});
+
+transferManualBtn.addEventListener('click', () => {
+    const merchant = manualMerchant.value.trim();
+    const date = manualDate.value;
+    const product = manualProduct.value.trim();
+    const category = manualCategory.value;
+    const amount = manualAmount.value.trim();
+
+    if (!merchant || !date || !product || !amount) {
+        alert("Por favor, rellena todos los campos.");
+        return;
+    }
+
+    // Actualizamos los datos globales (cabecera del ticket)
+    globalMerchantInput.value = merchant;
+    globalDateInput.value = date;
+
+    // Añadimos la fila a la tabla
+    addTableRow(product, amount, category);
+    updateTableTotal();
+    
+    // Limpiar y cerrar
+    manualMerchant.value = '';
+    manualProduct.value = '';
+    manualAmount.value = '';
+    manualEntryOverlay.style.display = 'none';
+});
+
+// Cargar configuración al iniciar
+loadConfig();
