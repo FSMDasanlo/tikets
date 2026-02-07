@@ -11,7 +11,7 @@
     <h1>Consultas y Gestión</h1>
     
     <!-- Botón para volver -->
-    <div style="width: 100%; max-width: 1200px; margin-bottom: 10px;">
+    <div class="header-actions">
         <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
         <button id="btnViewTotal" class="btn-save" style="width: auto; background-color: #17a2b8; margin-left: 10px;">Solo Total</button>
         <button id="btnViewDetail" class="btn-save" style="width: auto; background-color: #007bff; margin-left: 5px;">Detalle</button>
@@ -23,7 +23,7 @@
             <h2 style="margin-bottom: 20px;">Filtros de Búsqueda</h2>
             <div class="filters-container">
                 <div class="filter-group">
-                    <label>Nivel 0</label>
+                    <label>Zona</label>
                     <select id="filterLevel0">
                         <option value="">Cargando...</option>
                     </select>
@@ -64,9 +64,9 @@
                 <thead>
                     <tr>
                         <th>Fecha</th>
-                        <th>Nivel 0</th>
+                        <th>Zona</th>
                         <th>Comercio</th>
-                        <th>Producto</th>
+                        <th>Concepto</th>
                         <th>Categoría</th>
                         <th>Importe</th>
                         <th>Acciones</th>
@@ -84,15 +84,15 @@
 
     <!-- Resumen Estadístico -->
     <div class="card-container" style="margin-top: 20px; justify-content: center; gap: 20px;">
-        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+        <div class="card stat-card">
             <h3 style="margin: 0; font-size: 1rem; color: #555;">Gasto Máximo</h3>
             <p id="statMax" style="font-size: 1.5rem; font-weight: bold; color: #dc3545; margin: 10px 0 0;">0.00 €</p>
         </div>
-        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+        <div class="card stat-card">
             <h3 style="margin: 0; font-size: 1rem; color: #555;">Gasto Medio</h3>
             <p id="statAvg" style="font-size: 1.5rem; font-weight: bold; color: #ffc107; margin: 10px 0 0;">0.00 €</p>
         </div>
-        <div class="card" style="width: 150px; padding: 20px; cursor: default; transform: none;">
+        <div class="card stat-card">
             <h3 style="margin: 0; font-size: 1rem; color: #555;">Nº Tickets</h3>
             <p id="statCount" style="font-size: 1.5rem; font-weight: bold; color: #17a2b8; margin: 10px 0 0;">0</p>
         </div>
@@ -111,7 +111,7 @@
             <h2>Editar Gasto</h2>
             <input type="hidden" id="editId"> <!-- ID oculto de Firestore -->
             <div class="form-group">
-                <label>Nivel 0</label>
+                <label>Zona</label>
                 <select id="editLevel0">
                     <option>Cargando...</option>
                 </select>
@@ -125,7 +125,7 @@
                 <input type="date" id="editDate">
             </div>
             <div class="form-group">
-                <label>Producto</label>
+                <label>Concepto</label>
                 <input type="text" id="editProduct">
             </div>
             <div class="form-group">

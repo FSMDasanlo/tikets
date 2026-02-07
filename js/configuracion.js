@@ -107,7 +107,7 @@ async function addItem(inputElement, collectionName, listElement) {
     const name = inputElement.value.trim();
     if (!name) return;
 
-    // Convertir a mayúsculas si es Nivel 0 para mantener consistencia
+    // Convertir a mayúsculas si es Zona para mantener consistencia
     const finalName = collectionName === 'levels' ? name.toUpperCase() : name;
 
     try {
@@ -174,7 +174,7 @@ function openEditModal(id, currentName, type, currentColor) {
     editItemName.value = currentName;
     editItemType.value = type; // 'levels' o 'categories'
     
-    modalTitle.textContent = type === 'levels' ? 'Editar Nivel 0' : 'Editar Categoría';
+    modalTitle.textContent = type === 'levels' ? 'Editar Zona' : 'Editar Categoría';
     
     // Mostrar/Ocultar campo de color
     if (type === 'categories') {

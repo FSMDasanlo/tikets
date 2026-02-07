@@ -32,11 +32,29 @@ let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqu
 let currentViewMode = 'detail'; // 'detail' o 'total'
 let expenseChart = null; // Variable para el gráfico
 let categoryColors = {}; // Mapa de colores por categoría
+let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
 
 // Elementos del Modal de Edición
 const editModalOverlay = document.getElementById('editModalOverlay');
 const closeEditBtn = document.getElementById('closeEditBtn');
 const saveEditBtn = document.getElementById('saveEditBtn');
+
+// Evento de ordenación en cabeceras
+if (resultsTableHead) {
+    resultsTableHead.addEventListener('click', (e) => {
+        const th = e.target.closest('th');
+        if (!th || !th.dataset.sort) return;
+        
+        const column = th.dataset.sort;
+        if (sortState.column === column) {
+            sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortState.column = column;
+            sortState.direction = 'asc';
+        }
+        renderTable();
+    });
+}
 
 // Función para cargar comercios únicos en el desplegable
 async function loadMerchants() {
@@ -70,7 +88,7 @@ async function loadMerchants() {
     }
 }
 
-// Función para cargar configuración (Niveles y Categorías)
+// Función para cargar configuración (Zonas y Categorías)
 async function loadConfig() {
     try {
         const levelsSnap = await getDocs(collection(db, "levels"));
@@ -82,7 +100,7 @@ async function loadConfig() {
         const editLevel = document.getElementById('editLevel0');
         const editCat = document.getElementById('editCategory');
 
-        // Rellenar Niveles
+        // Rellenar Zonas
         if (!levelsSnap.empty) {
             // Guardar opción "Todos" para el filtro
             filterLevel.innerHTML = '<option value="">Todos</option>';
@@ -136,10 +154,10 @@ async function searchExpenses() {
         // filtraremos en la nube solo por FECHA (si existe) o NIVEL 0, y el resto en JavaScript.
         
         if (level0) {
-            // Filtramos en la nube por Nivel 0 si está seleccionado
+            // Filtramos en la nube por Zona si está seleccionado
             q = query(q, where("level0", "==", level0));
         }
-        // Si no hay ni fechas ni nivel 0, traemos todo (Firestore es rápido leyendo)
+        // Si no hay ni fechas ni zona, traemos todo (Firestore es rápido leyendo)
 
         const querySnapshot = await getDocs(q);
         console.log(`📡 Documentos recuperados de Firestore: ${querySnapshot.size}`);
@@ -152,7 +170,7 @@ async function searchExpenses() {
         // --- FILTRADO EN CLIENTE (JavaScript) ---
         // Refinamos los resultados con el resto de filtros
         const filteredDocs = docs.filter(item => {
-            // 1. Filtro Nivel 0 (si no se usó en la query principal)
+            // 1. Filtro Zona (si no se usó en la query principal)
             if (level0 && item.level0 !== level0) return false;
             
             // 2. Filtro Categoría
@@ -177,8 +195,8 @@ async function searchExpenses() {
             return true;
         });
 
-        // Ordenar por fecha descendente (más reciente primero)
-        filteredDocs.sort((a, b) => new Date(b.date) - new Date(a.date));
+        // Resetear ordenación por defecto al buscar
+        sortState = { column: 'date', direction: 'desc' };
 
         // Guardamos los datos en la variable global
         originalFilteredDocs = [...filteredDocs]; // Guardamos copia para poder restaurar tras filtrar por gráfico
@@ -209,17 +227,41 @@ function renderTable() {
         return;
     }
 
+    // Helper para iconos de ordenación
+    const getSortIcon = (col) => {
+        if (sortState.column !== col) return '';
+        return sortState.direction === 'asc' ? ' ▲' : ' ▼';
+    };
+
     // --- MODO DETALLE ---
     if (currentViewMode === 'detail') {
+        // Ordenar datos
+        currentFilteredDocs.sort((a, b) => {
+            let valA = a[sortState.column];
+            let valB = b[sortState.column];
+            
+            if (sortState.column === 'amount') {
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+            } else {
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+            
+            if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th>Fecha</th>
-                <th>Nivel 0</th>
-                <th>Comercio</th>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th>Importe</th>
+                <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
+                <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
+                <th data-sort="product" style="cursor: pointer;">Concepto${getSortIcon('product')}</th>
+                <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
+                <th data-sort="amount" style="cursor: pointer;">Importe${getSortIcon('amount')}</th>
                 <th>Acciones</th>
             </tr>
         `;
@@ -229,8 +271,15 @@ function renderTable() {
             const amount = parseFloat(item.amount) || 0;
             totalAmount += amount;
 
+            // Formatear fecha de YYYY-MM-DD a DD-MM-YYYY
+            let displayDate = item.date;
+            if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, d] = displayDate.split('-');
+                displayDate = `${d}-${m}-${y}`;
+            }
+
             row.innerHTML = `
-                <td>${item.date}</td>
+                <td>${displayDate}</td>
                 <td>${item.level0 || '-'}</td>
                 <td>${item.merchant}</td>
                 <td>${item.product}</td>
@@ -249,15 +298,15 @@ function renderTable() {
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th>Fecha</th>
-                <th>Nivel 0</th>
-                <th>Comercio</th>
-                <th>Importe Total</th>
+                <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
+                <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
+                <th data-sort="amount" style="cursor: pointer;">Importe Total${getSortIcon('amount')}</th>
                 <th>Acciones</th>
             </tr>
         `;
 
-        // Agrupar datos por (Fecha + Comercio + Nivel0)
+        // Agrupar datos por (Fecha + Comercio + Zona)
         const groups = {};
         currentFilteredDocs.forEach(item => {
             const key = `${item.date}|${item.merchant}|${item.level0}`;
@@ -277,7 +326,21 @@ function renderTable() {
         });
 
         // Convertir a array y ordenar
-        const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sortedGroups = Object.values(groups).sort((a, b) => {
+            let valA = a[sortState.column];
+            let valB = b[sortState.column];
+            
+            if (sortState.column === 'amount') {
+                // amount ya es número
+            } else {
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+            
+            if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
 
         sortedGroups.forEach(group => {
             const row = document.createElement('tr');
@@ -289,8 +352,15 @@ function renderTable() {
             // Convertimos el array de IDs a string para pasarlo al botón (o usamos un índice)
             const idsString = JSON.stringify(group.ids);
 
+            // Formatear fecha de YYYY-MM-DD a DD-MM-YYYY
+            let displayDate = group.date;
+            if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, d] = displayDate.split('-');
+                displayDate = `${d}-${m}-${y}`;
+            }
+
             row.innerHTML = `
-                <td>${group.date}</td>
+                <td>${displayDate}</td>
                 <td>${group.level0 || '-'}</td>
                 <td>${group.merchant}</td>
                 <td style="text-align: right; font-weight: bold;">${group.amount.toFixed(2)} €</td>
@@ -307,11 +377,11 @@ function renderTable() {
 
             let detailsHtml = `
                 <td colspan="5" style="padding: 15px;">
-                    <div style="margin-bottom: 5px; font-weight: bold; color: #555;">Detalle de productos:</div>
+                    <div style="margin-bottom: 5px; font-weight: bold; color: #555;">Detalle de conceptos:</div>
                     <table style="width: 100%; background: white; border: 1px solid #dee2e6; font-size: 0.9rem;">
                         <thead style="background-color: #e9ecef;">
                             <tr>
-                                <th style="padding: 8px;">Producto</th>
+                                <th style="padding: 8px;">Concepto</th>
                                 <th style="padding: 8px;">Categoría</th>
                                 <th style="padding: 8px; text-align: right;">Importe</th>
                             </tr>

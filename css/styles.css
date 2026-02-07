@@ -282,7 +282,7 @@ tfoot td {
     box-sizing: border-box;
 }
 
-/* Colores para la cabecera según el Nivel 0 */
+/* Colores para la cabecera según la Zona */
 .ticket-info.level-madrid {
     background-color: #e7f3ff; /* Azul claro */
 }
@@ -397,4 +397,97 @@ tfoot td {
 
 .btn-delete {
     background-color: #dc3545;
+}
+
+/* --- CLASES AUXILIARES PARA RESPONSIVE --- */
+
+/* Contenedor de botones de cabecera */
+.header-actions {
+    width: 100%;
+    max-width: 1200px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Tarjetas de estadísticas (reemplaza estilos inline) */
+.stat-card {
+    width: 150px;
+    padding: 20px;
+    cursor: default;
+    transform: none !important; /* Evitar efecto hover */
+}
+
+.stat-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Mantener sombra base */
+}
+
+/* --- MEDIA QUERIES (MÓVIL) --- */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+    }
+
+    /* Botones de cabecera en columna */
+    .header-actions {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .header-actions button {
+        width: 100%;
+        margin-left: 0 !important;
+    }
+
+    /* Tarjetas ocupan todo el ancho */
+    .card {
+        width: 100%;
+        padding: 20px; /* Reducir padding */
+        box-sizing: border-box;
+    }
+
+    /* Estadísticas: 100% ancho en móvil para leer bien */
+    .stat-card {
+        width: 100%;
+    }
+
+    /* Formularios en columna (Ticket Info y Filtros) */
+    .ticket-info, 
+    .filters-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+
+    .filter-group, 
+    .filter-group input, 
+    .filter-group select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Tablas con scroll horizontal */
+    .table-container {
+        padding: 10px;
+        overflow-x: auto; /* Permite deslizar la tabla si no cabe */
+    }
+
+    table {
+        min-width: 600px; /* Fuerza un ancho mínimo para que no se aplaste el contenido */
+    }
+
+    /* Ajuste de modales */
+    .modal-content {
+        width: 95%;
+        padding: 15px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
 }

@@ -54,7 +54,7 @@ let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros
 // Función para cargar configuración desde Firebase
 async function loadConfig() {
     try {
-        // Cargar Niveles
+        // Cargar Zonas
         const levelsSnap = await getDocs(collection(db, "levels"));
         const levelSelect = document.getElementById('globalLevel0');
         
@@ -112,7 +112,7 @@ clearTableBtn.addEventListener('click', () => {
     }
 });
 
-// Evento para cambiar el color de la cabecera según el Nivel 0
+// Evento para cambiar el color de la cabecera según la Zona
 globalLevel0Input.addEventListener('change', () => {
     ticketInfoDiv.classList.remove('level-madrid', 'level-almenara', 'level-global');
     const selectedLevel = globalLevel0Input.value.toLowerCase();

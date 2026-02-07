@@ -11,7 +11,7 @@
     <h1>Tikets y Recibos</h1>
 
     <!-- Botón para volver -->
-    <div style="width: 100%; max-width: 1200px; margin-bottom: 10px;">
+    <div class="header-actions">
         <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
     </div>
 
@@ -54,7 +54,7 @@
         <!-- Datos Globales del Ticket -->
         <div class="ticket-info level-madrid">
             <div>
-                <label for="globalLevel0">Nivel 0</label>
+                <label for="globalLevel0">Zona</label>
                 <select id="globalLevel0">
                     <option>Cargando...</option>
                 </select>
@@ -72,7 +72,7 @@
         <table id="ticketsTable">
             <thead>
                 <tr>
-                    <th>Producto</th>
+                    <th>Concepto</th>
                     <th>Categoría</th>
                     <th>Importe</th>
                     <th>Acciones</th>
@@ -114,7 +114,7 @@
                 <input type="date" id="manualDate">
             </div>
             <div class="form-group">
-                <label for="manualProduct">Producto</label>
+                <label for="manualProduct">Concepto</label>
                 <input type="text" id="manualProduct" placeholder="Ej: Pan">
             </div>
             <div class="form-group">
