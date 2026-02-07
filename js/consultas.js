@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // --- CONFIGURACIÓN DE FIREBASE (Copiada de script.js) ---
 const firebaseConfig = {
@@ -38,6 +38,7 @@ let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
 const editModalOverlay = document.getElementById('editModalOverlay');
 const closeEditBtn = document.getElementById('closeEditBtn');
 const saveEditBtn = document.getElementById('saveEditBtn');
+const editModalTitle = document.getElementById('editModalTitle');
 
 // Evento de ordenación en cabeceras
 if (resultsTableHead) {
@@ -56,15 +57,18 @@ if (resultsTableHead) {
     });
 }
 
-// Función para cargar comercios únicos en el desplegable
-async function loadMerchants() {
+// Función para cargar comercios y conceptos únicos en los desplegables
+async function loadFilterOptions() {
     const merchantSelect = document.getElementById('filterMerchant');
+    const productSelect = document.getElementById('filterProduct');
     // Indicador de carga
     merchantSelect.innerHTML = '<option value="">Cargando...</option>';
+    productSelect.innerHTML = '<option value="">Cargando...</option>';
 
     try {
         const querySnapshot = await getDocs(collection(db, "expenses"));
         const merchants = new Set();
+        const products = new Set();
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
@@ -72,8 +76,15 @@ async function loadMerchants() {
                 merchants.add(data.merchant.trim());
             }
         });
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.product) {
+                products.add(data.product.trim());
+            }
+        });
 
         const sortedMerchants = Array.from(merchants).sort();
+        const sortedProducts = Array.from(products).sort();
 
         merchantSelect.innerHTML = '<option value="">Todos</option>';
         sortedMerchants.forEach(m => {
@@ -82,9 +93,18 @@ async function loadMerchants() {
             option.textContent = m;
             merchantSelect.appendChild(option);
         });
+
+        productSelect.innerHTML = '<option value="">Todos</option>';
+        sortedProducts.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p;
+            option.textContent = p;
+            productSelect.appendChild(option);
+        });
     } catch (error) {
-        console.error("Error cargando comercios:", error);
+        console.error("Error cargando filtros:", error);
         merchantSelect.innerHTML = '<option value="">Error</option>';
+        productSelect.innerHTML = '<option value="">Error</option>';
     }
 }
 
@@ -142,6 +162,7 @@ async function searchExpenses() {
     
     const level0 = document.getElementById('filterLevel0').value;
     const merchant = document.getElementById('filterMerchant').value;
+    const product = document.getElementById('filterProduct').value;
     const category = document.getElementById('filterCategory').value;
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
@@ -179,7 +200,10 @@ async function searchExpenses() {
             // 3. Filtro Comercio (Coincidencia exacta ahora que es desplegable)
             if (merchant && item.merchant !== merchant) return false;
             
-            // 4. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
+            // 4. Filtro Concepto
+            if (product && item.product !== product) return false;
+
+            // 5. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
             if (dateStart || dateEnd) {
                 let itemDateStr = item.date;
                 // Si la fecha guardada es antigua (DD/MM/YYYY), la convertimos para comparar
@@ -286,6 +310,7 @@ function renderTable() {
                 <td>${item.category}</td>
                 <td style="text-align: right; font-weight: bold;">${amount.toFixed(2)} €</td>
                 <td style="text-align: center;">
+                    <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
                     <button class="action-btn btn-edit" data-id="${item.id}">✏️</button>
                     <button class="action-btn btn-delete" data-id="${item.id}">🗑️</button>
                 </td>
@@ -301,6 +326,8 @@ function renderTable() {
                 <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
+                <th>Concepto</th>
+                <th>Categoría</th>
                 <th data-sort="amount" style="cursor: pointer;">Importe Total${getSortIcon('amount')}</th>
                 <th>Acciones</th>
             </tr>
@@ -359,10 +386,16 @@ function renderTable() {
                 displayDate = `${d}-${m}-${y}`;
             }
 
+            // Obtener conceptos y categorías únicos para mostrar en la fila resumen
+            const concepts = [...new Set(group.items.map(i => i.product))].join(', ');
+            const categories = [...new Set(group.items.map(i => i.category))].join(', ');
+
             row.innerHTML = `
                 <td>${displayDate}</td>
                 <td>${group.level0 || '-'}</td>
                 <td>${group.merchant}</td>
+                <td style="font-size: 0.9rem; color: #555;">${concepts}</td>
+                <td style="font-size: 0.9rem; color: #555;">${categories}</td>
                 <td style="text-align: right; font-weight: bold;">${group.amount.toFixed(2)} €</td>
                 <td style="text-align: center;">
                     <button class="action-btn btn-view-group" style="background-color: #17a2b8; margin-right: 5px;" title="Ver Detalle">👁️</button>
@@ -376,7 +409,7 @@ function renderTable() {
             detailRow.style.backgroundColor = '#f8f9fa';
 
             let detailsHtml = `
-                <td colspan="5" style="padding: 15px;">
+                <td colspan="7" style="padding: 15px;">
                     <div style="margin-bottom: 5px; font-weight: bold; color: #555;">Detalle de conceptos:</div>
                     <table style="width: 100%; background: white; border: 1px solid #dee2e6; font-size: 0.9rem;">
                         <thead style="background-color: #e9ecef;">
@@ -423,7 +456,7 @@ function renderTable() {
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot) {
-        const colspan = currentViewMode === 'detail' ? 5 : 3;
+        const colspan = 5; // Ahora ambos modos tienen 5 columnas antes del importe
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
@@ -444,6 +477,9 @@ function renderTable() {
     });
         document.querySelectorAll('.btn-edit').forEach(btn => {
         btn.addEventListener('click', (e) => openEditModal(e.target.dataset.id, currentFilteredDocs));
+        });
+        document.querySelectorAll('.btn-duplicate').forEach(btn => {
+            btn.addEventListener('click', (e) => openDuplicateModal(e.target.dataset.id, currentFilteredDocs));
         });
     updateStats(); // Actualizar estadísticas con los datos visibles
 }
@@ -584,11 +620,40 @@ function openEditModal(id, allDocs) {
     const item = allDocs.find(d => d.id === id);
     if (!item) return;
 
+    editModalTitle.textContent = "Editar Gasto";
+    saveEditBtn.textContent = "Guardar Cambios";
+
     document.getElementById('editId').value = id;
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
     document.getElementById('editMerchant').value = item.merchant;
     
     // CORRECCIÓN DE FECHA: Si viene en formato antiguo DD/MM/YYYY, convertir a YYYY-MM-DD
+    let dateValue = item.date;
+    if (dateValue && dateValue.includes('/')) {
+        const [d, m, y] = dateValue.split('/');
+        dateValue = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    document.getElementById('editDate').value = dateValue;
+    
+    document.getElementById('editProduct').value = item.product;
+    document.getElementById('editCategory').value = item.category;
+    document.getElementById('editAmount').value = item.amount;
+
+    editModalOverlay.style.display = 'flex';
+}
+
+// Función para abrir modal en modo DUPLICAR
+function openDuplicateModal(id, allDocs) {
+    const item = allDocs.find(d => d.id === id);
+    if (!item) return;
+
+    editModalTitle.textContent = "Duplicar Gasto";
+    saveEditBtn.textContent = "Crear Nuevo Gasto";
+
+    document.getElementById('editId').value = ""; // ID vacío indica creación
+    document.getElementById('editLevel0').value = item.level0 || 'MADRID';
+    document.getElementById('editMerchant').value = item.merchant;
+    
     let dateValue = item.date;
     if (dateValue && dateValue.includes('/')) {
         const [d, m, y] = dateValue.split('/');
@@ -619,16 +684,23 @@ saveEditBtn.addEventListener('click', async () => {
     saveEditBtn.disabled = true;
 
     try {
-        const docRef = doc(db, "expenses", id);
-        await updateDoc(docRef, updatedData);
-        alert("Registro actualizado correctamente.");
+        if (id) {
+            // MODO EDICIÓN
+            const docRef = doc(db, "expenses", id);
+            await updateDoc(docRef, updatedData);
+            alert("Registro actualizado correctamente.");
+        } else {
+            // MODO DUPLICACIÓN (Crear nuevo)
+            await addDoc(collection(db, "expenses"), updatedData);
+            alert("Nuevo gasto creado correctamente.");
+        }
+        
         editModalOverlay.style.display = 'none';
         searchExpenses(); // Recargar tabla
     } catch (error) {
-        console.error("Error al actualizar:", error);
-        alert("Error al guardar los cambios.");
+        console.error("Error al guardar:", error);
+        alert("Error al guardar los cambios: " + error.message);
     } finally {
-        saveEditBtn.textContent = "Guardar Cambios";
         saveEditBtn.disabled = false;
     }
 });
@@ -641,7 +713,7 @@ closeEditBtn.addEventListener('click', () => {
 if(searchBtn) {
     searchBtn.addEventListener('click', searchExpenses);
     // Cargar comercios al iniciar
-    loadMerchants();
+    loadFilterOptions();
     loadConfig();
 
     // Eventos botones de vista

@@ -35,6 +35,12 @@
                     </select>
                 </div>
                 <div class="filter-group">
+                    <label>Concepto</label>
+                    <select id="filterProduct">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label>Categoría</label>
                     <select id="filterCategory">
                         <option value="">Cargando...</option>
@@ -108,7 +114,7 @@
     <!-- Modal Edición -->
     <div id="editModalOverlay" class="modal-overlay">
         <div class="modal-content">
-            <h2>Editar Gasto</h2>
+            <h2 id="editModalTitle">Editar Gasto</h2>
             <input type="hidden" id="editId"> <!-- ID oculto de Firestore -->
             <div class="form-group">
                 <label>Zona</label>
