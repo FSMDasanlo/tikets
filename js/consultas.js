@@ -166,6 +166,7 @@ async function searchExpenses() {
     const category = document.getElementById('filterCategory').value;
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
+    const showReturns = document.getElementById('filterReturns').checked;
 
     try {
         let q = collection(db, "expenses");
@@ -194,14 +195,23 @@ async function searchExpenses() {
             // 1. Filtro Zona (si no se usó en la query principal)
             if (level0 && item.level0 !== level0) return false;
             
-            // 2. Filtro Categoría
-            if (category && item.category !== category) return false;
-            
-            // 3. Filtro Comercio (Coincidencia exacta ahora que es desplegable)
-            if (merchant && item.merchant !== merchant) return false;
-            
-            // 4. Filtro Concepto
-            if (product && item.product !== product) return false;
+            // Lógica para Devoluciones (Checkbox)
+            if (showReturns) {
+                // Si está marcado, SOLO mostramos importes negativos (devoluciones)
+                // e ignoramos filtros de Categoría, Comercio y Concepto para traer "TODAS"
+                if ((parseFloat(item.amount) || 0) >= 0) return false;
+            } else {
+                // Lógica normal
+                
+                // 2. Filtro Categoría
+                if (category && item.category !== category) return false;
+                
+                // 3. Filtro Comercio (Coincidencia exacta ahora que es desplegable)
+                if (merchant && item.merchant !== merchant) return false;
+                
+                // 4. Filtro Concepto
+                if (product && item.product !== product) return false;
+            }
 
             // 5. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
             if (dateStart || dateEnd) {
@@ -302,6 +312,11 @@ function renderTable() {
                 displayDate = `${d}-${m}-${y}`;
             }
 
+            // Sombreado verde si es negativo (devolución)
+            if (amount < 0) {
+                row.style.backgroundColor = '#d4edda';
+            }
+
             row.innerHTML = `
                 <td>${displayDate}</td>
                 <td>${item.level0 || '-'}</td>
@@ -311,8 +326,8 @@ function renderTable() {
                 <td style="text-align: right; font-weight: bold;">${amount.toFixed(2)} €</td>
                 <td style="text-align: center;">
                     <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
-                    <button class="action-btn btn-edit" data-id="${item.id}">✏️</button>
-                    <button class="action-btn btn-delete" data-id="${item.id}">🗑️</button>
+                    <button class="action-btn btn-edit" data-id="${item.id}" title="Editar">✏️</button>
+                    <button class="action-btn btn-delete" data-id="${item.id}" title="Borrar">🗑️</button>
                 </td>
             `;
             resultsTableBody.appendChild(row);
@@ -373,6 +388,11 @@ function renderTable() {
             const row = document.createElement('tr');
             row.style.cursor = 'pointer';
             row.title = "Haz clic para ver el detalle de productos";
+            
+            // Sombreado verde si es negativo (devolución)
+            const defaultBg = group.amount < 0 ? '#d4edda' : '';
+            row.style.backgroundColor = defaultBg;
+
             totalAmount += group.amount;
 
             // En modo total, el botón de borrar eliminará TODO el grupo
@@ -423,11 +443,13 @@ function renderTable() {
             `;
 
             group.items.forEach(item => {
+                const itemAmount = parseFloat(item.amount) || 0;
+                const itemStyle = itemAmount < 0 ? 'background-color: #d4edda;' : '';
                 detailsHtml += `
-                    <tr>
+                    <tr style="${itemStyle}">
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.product}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.category}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${parseFloat(item.amount).toFixed(2)} €</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${itemAmount.toFixed(2)} €</td>
                     </tr>
                 `;
             });
@@ -445,7 +467,7 @@ function renderTable() {
                     row.style.backgroundColor = '#e2e6ea'; // Resaltar fila activa
                 } else {
                     detailRow.style.display = 'none';
-                    row.style.backgroundColor = ''; // Quitar resalte
+                    row.style.backgroundColor = defaultBg; // Restaurar color original
                 }
             });
 
@@ -489,24 +511,38 @@ function renderChart() {
     const ctx = document.getElementById('expenseChart');
     if (!ctx) return;
 
-    // Calcular totales por categoría
-    const categoryTotals = {};
+    // Comprobar si hay una categoría seleccionada en el filtro
+    const selectedCategoryFilter = document.getElementById('filterCategory').value;
+    const isCategorySelected = selectedCategoryFilter !== "";
+
+    // Calcular totales (por Categoría o por Comercio)
+    const dataTotals = {};
     currentFilteredDocs.forEach(item => {
-        const cat = item.category || 'Sin Categoría';
+        const key = isCategorySelected ? (item.merchant || 'Sin Comercio') : (item.category || 'Sin Categoría');
         const amount = parseFloat(item.amount) || 0;
-        categoryTotals[cat] = (categoryTotals[cat] || 0) + amount;
+        dataTotals[key] = (dataTotals[key] || 0) + amount;
     });
 
-    // Crear etiquetas con el importe incluido (Ej: "Alimentación: 50.00 €")
-    const labels = Object.keys(categoryTotals).map(cat => {
-        return `${cat}: ${categoryTotals[cat].toFixed(2)} €`;
+    // Crear etiquetas con el importe incluido
+    const labels = Object.keys(dataTotals).map(key => {
+        return `${key}: ${dataTotals[key].toFixed(2)} €`;
     });
-    const data = Object.values(categoryTotals);
+    const data = Object.values(dataTotals);
     
-    // Mapear colores según la categoría
-    const backgroundColors = Object.keys(categoryTotals).map(cat => {
-        // Si tenemos color guardado lo usamos, si no, uno gris por defecto
-        return categoryColors[cat] || '#cccccc';
+    // Mapear colores
+    const backgroundColors = Object.keys(dataTotals).map(key => {
+        if (isCategorySelected) {
+            // Generar color basado en hash para comercios (para que sea consistente)
+            let hash = 0;
+            for (let i = 0; i < key.length; i++) {
+                hash = key.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            return `hsl(${hue}, 70%, 60%)`;
+        } else {
+            // Usar color de categoría si existe
+            return categoryColors[key] || '#cccccc';
+        }
     });
 
     // Destruir gráfico anterior si existe para no superponerlos
@@ -530,18 +566,27 @@ function renderChart() {
             maintainAspectRatio: false,
             plugins: {
                 legend: { position: 'bottom' },
-                title: { display: true, text: 'Gastos por Categoría' }
+                title: { 
+                    display: true, 
+                    text: isCategorySelected ? `Gastos por Comercio (${selectedCategoryFilter})` : 'Gastos por Categoría' 
+                }
             },
             onClick: (event, elements) => {
                 if (elements.length > 0) {
-                    // Clic en un segmento: Filtrar tabla por esa categoría
+                    // Clic en un segmento: Filtrar tabla
                     const index = elements[0].index;
                     const label = expenseChart.data.labels[index];
-                    // El label es "Categoría: Importe €", extraemos solo la categoría
-                    const selectedCategory = label.split(':')[0].trim();
+                    // El label es "Clave: Importe €", extraemos solo la clave
+                    const selectedKey = label.split(':')[0].trim();
 
                     // Filtramos sobre los datos ORIGINALES de la búsqueda
-                    currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === selectedCategory);
+                    if (isCategorySelected) {
+                        // Filtrar por comercio
+                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.merchant || 'Sin Comercio') === selectedKey);
+                    } else {
+                        // Filtrar por categoría
+                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === selectedKey);
+                    }
                     renderTable();
                 } else {
                     // Clic en el fondo: Restaurar todos los datos
