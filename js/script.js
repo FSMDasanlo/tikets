@@ -1,6 +1,6 @@
 // --- CONFIGURACIÓN DE FIREBASE ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, writeBatch, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, writeBatch, doc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ⚠️
 const firebaseConfig = {
@@ -41,7 +41,7 @@ const ticketInfoDiv = document.querySelector('.ticket-info');
 const manualEntryCard = document.getElementById('manualEntryCard');
 const manualEntryOverlay = document.getElementById('manualEntryOverlay');
 const closeManualBtn = document.getElementById('closeManualBtn');
-const transferManualBtn = document.getElementById('transferManualBtn');
+const saveManualDirectBtn = document.getElementById('saveManualDirectBtn');
 // Inputs manuales
 const manualMerchant = document.getElementById('manualMerchant');
 const manualDate = document.getElementById('manualDate');
@@ -470,31 +470,48 @@ closeManualBtn.addEventListener('click', () => {
     manualEntryOverlay.style.display = 'none';
 });
 
-transferManualBtn.addEventListener('click', () => {
+saveManualDirectBtn.addEventListener('click', async () => {
     const merchant = manualMerchant.value.trim();
     const date = manualDate.value;
     const product = manualProduct.value.trim();
     const category = manualCategory.value;
-    const amount = manualAmount.value.trim();
+    const amount = parseFloat(manualAmount.value);
+    const level0 = globalLevel0Input.value; // Usamos la Zona seleccionada en la pantalla principal
 
-    if (!merchant || !date || !product || !amount) {
+    if (!merchant || !date || !product || isNaN(amount)) {
         alert("Por favor, rellena todos los campos.");
         return;
     }
 
-    // Actualizamos los datos globales (cabecera del ticket)
-    globalMerchantInput.value = merchant;
-    globalDateInput.value = date;
+    const data = {
+        level0,
+        merchant,
+        date,
+        product,
+        category,
+        amount
+    };
 
-    // Añadimos la fila a la tabla
-    addTableRow(product, amount, category);
-    updateTableTotal();
-    
-    // Limpiar y cerrar
-    manualMerchant.value = '';
-    manualProduct.value = '';
-    manualAmount.value = '';
-    manualEntryOverlay.style.display = 'none';
+    try {
+        saveManualDirectBtn.disabled = true;
+        saveManualDirectBtn.textContent = "Guardando...";
+        
+        await addDoc(collection(db, "expenses"), data);
+        
+        alert("✅ Gasto guardado correctamente en la base de datos.");
+        
+        // Limpiar y cerrar
+        manualMerchant.value = '';
+        manualProduct.value = '';
+        manualAmount.value = '';
+        manualEntryOverlay.style.display = 'none';
+    } catch (error) {
+        console.error("Error guardando manual:", error);
+        alert("Error al guardar: " + error.message);
+    } finally {
+        saveManualDirectBtn.disabled = false;
+        saveManualDirectBtn.textContent = "Guardar en BD";
+    }
 });
 
 // Cargar configuración al iniciar
