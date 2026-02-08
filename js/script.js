@@ -1,6 +1,7 @@
 // --- CONFIGURACIÓN DE FIREBASE ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, query, where, writeBatch, doc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ⚠️
 const firebaseConfig = {
@@ -16,6 +17,19 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+let currentUser = null;
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        const headerUserDisplay = document.getElementById('headerUserDisplay');
+        if(headerUserDisplay) headerUserDisplay.textContent = `Usuario: ${user.email}`;
+        loadConfig(); // Cargar configuración solo cuando tenemos usuario
+    } else {
+        window.location.href = 'login.html';
+    }
+});
 
 // Configuración del worker de PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -53,9 +67,12 @@ let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros
 
 // Función para cargar configuración desde Firebase
 async function loadConfig() {
+    if (!currentUser) return;
+
     try {
         // Cargar Zonas
-        const levelsSnap = await getDocs(collection(db, "levels"));
+        // Filtramos por UID para que cada usuario tenga sus zonas
+        const levelsSnap = await getDocs(query(collection(db, "levels"), where("uid", "==", currentUser.uid)));
         const levelSelect = document.getElementById('globalLevel0');
         
         if (!levelsSnap.empty) {
@@ -70,7 +87,7 @@ async function loadConfig() {
         }
 
         // Cargar Categorías
-        const catsSnap = await getDocs(collection(db, "categories"));
+        const catsSnap = await getDocs(query(collection(db, "categories"), where("uid", "==", currentUser.uid)));
         const manualCatSelect = document.getElementById('manualCategory');
         
         if (!catsSnap.empty) {
@@ -151,7 +168,8 @@ async function saveDataToDb() {
             date: date,
             product: cells[0].innerText,
             category: categorySelect.value,
-            amount: amountVal // Guardamos como número
+            amount: amountVal, // Guardamos como número
+            uid: currentUser.uid // IMPORTANTE: Asociar al usuario
         });
     });
 
@@ -161,7 +179,8 @@ async function saveDataToDb() {
         const q = query(
             collection(db, "expenses"), 
             where("merchant", "==", merchant), 
-            where("date", "==", date)
+            where("date", "==", date),
+            where("uid", "==", currentUser.uid) // Solo buscar duplicados propios
         );
         
         const querySnapshot = await getDocs(q);
@@ -459,11 +478,80 @@ saveDbBtn.addEventListener('click', saveDataToDb);
 
 // --- Lógica para Recibo Manual ---
 
+let merchantCategoryMap = {}; // Mapa para guardar la última categoría por comercio
+
+// Función para cargar sugerencias de comercios y productos existentes
+async function loadManualEntrySuggestions() {
+    if (!currentUser) return;
+    const datalist = document.getElementById('merchantSuggestions');
+    const productDatalist = document.getElementById('productSuggestions');
+    if (!merchantDatalist || !productDatalist) return;
+
+    try {
+        // Consultamos todos los gastos del usuario
+        const q = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        const merchants = new Set();
+        const products = new Set();
+        merchantCategoryMap = {}; // Reiniciar mapa
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            
+            // Recopilar Comercios y mapear categorías
+            if (data.merchant) {
+                const m = data.merchant.trim();
+                merchants.add(m);
+
+                // Guardar última categoría usada (la más reciente por fecha)
+                if (data.category && data.date) {
+                    if (!merchantCategoryMap[m] || data.date > merchantCategoryMap[m].date) {
+                        merchantCategoryMap[m] = { date: data.date, category: data.category };
+                    }
+                }
+            }
+            // Recopilar Productos
+            if (data.product) {
+                products.add(data.product.trim());
+            }
+        });
+
+        // Rellenar Datalist Comercios
+        merchantDatalist.innerHTML = '';
+        Array.from(merchants).sort().forEach(merchant => {
+            const option = document.createElement('option');
+            option.value = merchant;
+            merchantDatalist.appendChild(option);
+        });
+
+        // Rellenar Datalist Productos
+        productDatalist.innerHTML = '';
+        Array.from(products).sort().forEach(product => {
+            const option = document.createElement('option');
+            option.value = product;
+            productDatalist.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error cargando sugerencias:", error);
+    }
+}
+
+// Evento para autocompletar categoría al elegir comercio
+manualMerchant.addEventListener('input', () => {
+    const merchant = manualMerchant.value.trim();
+    if (merchantCategoryMap[merchant]) {
+        manualCategory.value = merchantCategoryMap[merchant].category;
+    }
+});
+
 manualEntryCard.addEventListener('click', () => {
     manualEntryOverlay.style.display = 'flex';
     // Poner fecha de hoy por defecto
     const today = new Date().toISOString().split('T')[0];
     manualDate.value = today;
+    
+    // Cargar sugerencias
+    loadManualEntrySuggestions();
 });
 
 closeManualBtn.addEventListener('click', () => {
@@ -489,7 +577,8 @@ saveManualDirectBtn.addEventListener('click', async () => {
         date,
         product,
         category,
-        amount
+        amount,
+        uid: currentUser.uid // IMPORTANTE: Asociar al usuario
     };
 
     try {
@@ -515,4 +604,4 @@ saveManualDirectBtn.addEventListener('click', async () => {
 });
 
 // Cargar configuración al iniciar
-loadConfig();
+// loadConfig(); // Se llama dentro de onAuthStateChanged

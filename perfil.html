@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil de Usuario</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <h1>Perfil de Usuario</h1>
+    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
+    
+    <!-- Botón para volver -->
+    <div class="header-actions">
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
+    </div>
+
+    <div class="card-container" style="flex-direction: column; align-items: center;">
+        
+        <!-- Información Básica -->
+        <div class="card" style="width: 100%; max-width: 500px; cursor: default; transform: none; padding: 30px;">
+            <h2>Mis Datos</h2>
+            <p style="margin-bottom: 20px;">Usuario conectado:</p>
+            <div style="background: #e9ecef; padding: 10px; border-radius: 5px; font-weight: bold; color: #333; margin-bottom: 20px;">
+                <span id="userEmail">Cargando...</span>
+            </div>
+
+            <h3 style="margin-top: 30px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Cambiar Contraseña</h3>
+            <div class="form-group">
+                <label>Nueva Contraseña</label>
+                <input type="password" id="newPassword" placeholder="Mínimo 6 caracteres">
+            </div>
+            <div class="form-group">
+                <label>Confirmar Contraseña</label>
+                <input type="password" id="confirmPassword" placeholder="Repite la contraseña">
+            </div>
+            <button id="btnUpdatePassword" class="btn-save">Actualizar Contraseña</button>
+        </div>
+
+        <!-- Copia de Seguridad -->
+        <div class="card" style="width: 100%; max-width: 500px; cursor: default; transform: none; padding: 30px; margin-top: 20px; border: 1px solid #17a2b8;">
+            <h2 style="color: #17a2b8;">Copia de Seguridad</h2>
+            <p>Descarga todos tus datos en un archivo JSON.</p>
+            <button id="btnExportData" class="btn-save" style="background-color: #17a2b8; margin-top: 20px;">
+                Exportar Datos
+            </button>
+            
+            <div style="border-top: 1px solid #eee; margin-top: 20px; padding-top: 20px;">
+                <button id="btnImportData" class="btn-save" style="background-color: #6c757d;">Importar / Restaurar JSON</button>
+                <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            </div>
+        </div>
+
+        <!-- Zona de Peligro -->
+        <div class="card" style="width: 100%; max-width: 500px; cursor: default; transform: none; padding: 30px; border: 1px solid #dc3545; margin-top: 20px;">
+            <h2 style="color: #dc3545;">Zona de Peligro</h2>
+            <p>Estas acciones son irreversibles.</p>
+            
+            <button id="btnDeleteAccount" class="btn-save" style="background-color: #dc3545; margin-top: 20px;">
+                Eliminar Cuenta
+            </button>
+            <p style="font-size: 0.8rem; color: #777; margin-top: 10px;">Se borrará tu usuario y todos tus datos asociados.</p>
+        </div>
+    </div>
+
+    <script type="module" src="js/perfil.js"></script>
+</body>
+</html>

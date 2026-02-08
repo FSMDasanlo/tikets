@@ -8,10 +8,13 @@
 </head>
 <body>
     <h1>Configuración</h1>
+    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
     
     <!-- Botón para volver -->
     <div style="width: 100%; max-width: 1200px; margin-bottom: 10px;">
-        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
     </div>
 
     <div class="card-container" style="align-items: flex-start;">
@@ -47,6 +50,14 @@
                 <!-- Lista dinámica -->
                 <li style="text-align: center; color: #777;">Cargando...</li>
             </ul>
+        </div>
+
+        <!-- Herramientas de Migración -->
+        <div id="adminCard" class="card" style="display: none; width: 100%; max-width: 450px; cursor: default; transform: none; border: 1px solid #ffc107;">
+            <h2>Migración de Datos</h2>
+            <p>Si tienes datos antiguos creados antes del sistema de usuarios, usa este botón para asignártelos.</p>
+            
+            <button id="migrateBtn" class="btn-save" style="background-color: #ffc107; color: #333; font-weight: bold;">Importar Datos Antiguos</button>
         </div>
     </div>
 

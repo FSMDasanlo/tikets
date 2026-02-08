@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 const firebaseConfig = {
@@ -15,6 +16,26 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+let currentUser = null;
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        const headerUserDisplay = document.getElementById('headerUserDisplay');
+        if(headerUserDisplay) headerUserDisplay.textContent = `Usuario: ${user.email}`;
+        loadCollection('levels', levelsList);
+        loadCollection('categories', categoriesList);
+        
+        // Mostrar panel de administración solo a Jesus
+        // Usamos toLowerCase() para asegurar que coincida aunque haya mayúsculas/minúsculas
+        if (user.email && user.email.toLowerCase() === 'jesus@gmail.com' && adminCard) {
+            adminCard.style.display = 'block';
+        }
+    } else {
+        window.location.href = 'login.html';
+    }
+});
 
 console.log("✅ Script configuracion.js cargado.");
 
@@ -26,6 +47,8 @@ const newCategoryInput = document.getElementById('newCategoryInput');
 const newCategoryColor = document.getElementById('newCategoryColor');
 const addLevelBtn = document.getElementById('addLevelBtn');
 const addCategoryBtn = document.getElementById('addCategoryBtn');
+const migrateBtn = document.getElementById('migrateBtn');
+const adminCard = document.getElementById('adminCard');
 
 // Modal
 const configEditModal = document.getElementById('configEditModal');
@@ -46,7 +69,8 @@ async function loadCollection(collectionName, listElement) {
     listElement.innerHTML = '<li style="text-align: center; color: #777;">Cargando...</li>';
     try {
         // Usamos consulta simple sin orderBy para evitar errores de índices en Firestore
-        const q = collection(db, collectionName);
+        // Filtramos por UID
+        const q = query(collection(db, collectionName), where("uid", "==", currentUser.uid));
         const querySnapshot = await getDocs(q);
         
         listElement.innerHTML = '';
@@ -112,7 +136,11 @@ async function addItem(inputElement, collectionName, listElement) {
 
     try {
         // VALIDACIÓN DE DUPLICADOS
-        const q = query(collection(db, collectionName), where("name", "==", finalName));
+        const q = query(
+            collection(db, collectionName), 
+            where("name", "==", finalName),
+            where("uid", "==", currentUser.uid)
+        );
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
@@ -120,7 +148,7 @@ async function addItem(inputElement, collectionName, listElement) {
             return;
         }
 
-        const data = { name: finalName };
+        const data = { name: finalName, uid: currentUser.uid };
         
         // Si es categoría, guardamos el color
         if (collectionName === 'categories' && newCategoryColor) {
@@ -141,7 +169,11 @@ async function deleteItem(id, name, collectionName, listElement) {
     if (collectionName === 'categories') {
         try {
             // Consultamos si hay gastos que usen esta categoría
-            const q = query(collection(db, "expenses"), where("category", "==", name));
+            const q = query(
+                collection(db, "expenses"), 
+                where("category", "==", name),
+                where("uid", "==", currentUser.uid)
+            );
             const snapshot = await getDocs(q);
             
             if (!snapshot.empty) {
@@ -207,7 +239,11 @@ saveConfigEditBtn.addEventListener('click', async () => {
 
         // Si es una categoría y el nombre ha cambiado, actualizamos los tickets asociados
         if (type === 'categories' && finalName !== currentOriginalName) {
-            const q = query(collection(db, "expenses"), where("category", "==", currentOriginalName));
+            const q = query(
+                collection(db, "expenses"), 
+                where("category", "==", currentOriginalName),
+                where("uid", "==", currentUser.uid)
+            );
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
@@ -262,8 +298,47 @@ if (newCategoryInput) {
     });
 }
 
+// --- MIGRACIÓN DE DATOS ---
+if (migrateBtn) {
+    migrateBtn.addEventListener('click', async () => {
+        if (!confirm("⚠️ ATENCIÓN ⚠️\n\nEsta acción buscará TODOS los gastos, categorías y zonas que NO tengan dueño (creados antes del login) y los asignará a TU usuario actual.\n\n¿Quieres continuar?")) {
+            return;
+        }
+
+        migrateBtn.disabled = true;
+        migrateBtn.textContent = "Procesando...";
+
+        try {
+            const collections = ['expenses', 'levels', 'categories'];
+            let totalUpdated = 0;
+
+            for (const colName of collections) {
+                // Obtenemos TODOS los documentos de la colección
+                const snapshot = await getDocs(collection(db, colName));
+                
+                for (const docSnap of snapshot.docs) {
+                    // Si no tiene UID, es un dato antiguo -> Lo actualizamos
+                    if (!docSnap.data().uid) {
+                        await updateDoc(docSnap.ref, { uid: currentUser.uid });
+                        totalUpdated++;
+                    }
+                }
+            }
+
+            alert(`✅ Migración completada con éxito.\n\nSe han recuperado y asignado ${totalUpdated} registros a tu cuenta.`);
+            // Recargar la página para ver los cambios
+            location.reload();
+
+        } catch (error) {
+            console.error("Error en migración:", error);
+            alert("Ocurrió un error durante la migración: " + error.message);
+            migrateBtn.disabled = false;
+            migrateBtn.textContent = "Importar Datos Antiguos";
+        }
+    });
+}
+
 // --- INICIALIZACIÓN ---
 
 // Cargar datos al iniciar
-loadCollection('levels', levelsList);
-loadCollection('categories', categoriesList);
+// loadCollection... // Se llama en onAuthStateChanged

@@ -9,6 +9,11 @@
 <body>
 
     <h1>GESTION DE GASTOS Y TIKETS</h1>
+    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
+
+    <div style="width: 100%; max-width: 1200px; text-align: right; margin-bottom: 20px;">
+        <button id="btnLogout" class="btn-save" style="width: auto; background-color: #dc3545; padding: 8px 15px;">Cerrar Sesión</button>
+    </div>
 
     <div class="card-container">
         <!-- Tarjeta 1 -->
@@ -31,7 +36,43 @@
             <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
             <p>Administra las categorías disponibles.</p>
         </div>
+
+        <!-- Tarjeta 4 -->
+        <div class="card" onclick="location.href='perfil.html'">
+            <h2>Perfil</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <p>Gestiona tu contraseña y cuenta.</p>
+        </div>
     </div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
+            authDomain: "tikets-e8747.firebaseapp.com",
+            projectId: "tikets-e8747",
+            storageBucket: "tikets-e8747.firebasestorage.app",
+            messagingSenderId: "1011614009578",
+            appId: "1:1011614009578:web:b18505cbd4b98e7a6d2f93",
+            measurementId: "G-Z3HSTEH6JN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+            } else {
+                document.getElementById('headerUserDisplay').textContent = `Usuario: ${user.email}`;
+            }
+        });
+
+        document.getElementById('btnLogout').addEventListener('click', () => {
+            signOut(auth);
+        });
+    </script>
 </body>
 </html>

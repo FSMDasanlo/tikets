@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- CONFIGURACIÓN DE FIREBASE (Copiada de script.js) ---
 const firebaseConfig = {
@@ -15,6 +16,20 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+let currentUser = null;
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        const headerUserDisplay = document.getElementById('headerUserDisplay');
+        if(headerUserDisplay) headerUserDisplay.textContent = `Usuario: ${user.email}`;
+        loadFilterOptions();
+        loadConfig();
+    } else {
+        window.location.href = 'login.html';
+    }
+});
 
 console.log("✅ Script consultas.js cargado y Firebase inicializado.");
 
@@ -66,7 +81,8 @@ async function loadFilterOptions() {
     productSelect.innerHTML = '<option value="">Cargando...</option>';
 
     try {
-        const querySnapshot = await getDocs(collection(db, "expenses"));
+        // Solo cargar opciones de MIS gastos
+        const querySnapshot = await getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid)));
         const merchants = new Set();
         const products = new Set();
 
@@ -111,8 +127,8 @@ async function loadFilterOptions() {
 // Función para cargar configuración (Zonas y Categorías)
 async function loadConfig() {
     try {
-        const levelsSnap = await getDocs(collection(db, "levels"));
-        const catsSnap = await getDocs(collection(db, "categories"));
+        const levelsSnap = await getDocs(query(collection(db, "levels"), where("uid", "==", currentUser.uid)));
+        const catsSnap = await getDocs(query(collection(db, "categories"), where("uid", "==", currentUser.uid)));
 
         // Elementos a rellenar
         const filterLevel = document.getElementById('filterLevel0');
@@ -171,15 +187,10 @@ async function searchExpenses() {
     try {
         let q = collection(db, "expenses");
         
-        // ESTRATEGIA ROBUSTA:
-        // Para evitar errores de "Falta Índice" en Firestore al combinar muchos filtros,
-        // filtraremos en la nube solo por FECHA (si existe) o NIVEL 0, y el resto en JavaScript.
-        
-        if (level0) {
-            // Filtramos en la nube por Zona si está seleccionado
-            q = query(q, where("level0", "==", level0));
-        }
-        // Si no hay ni fechas ni zona, traemos todo (Firestore es rápido leyendo)
+        // ESTRATEGIA SEGURA: Filtrar SIEMPRE por UID en la nube.
+        // Para evitar errores de índices complejos, traemos TODO lo del usuario
+        // y filtramos el resto (Zona, Fecha, etc.) en JavaScript.
+        q = query(q, where("uid", "==", currentUser.uid));
 
         const querySnapshot = await getDocs(q);
         console.log(`📡 Documentos recuperados de Firestore: ${querySnapshot.size}`);
@@ -724,6 +735,9 @@ saveEditBtn.addEventListener('click', async () => {
         category: document.getElementById('editCategory').value,
         amount: parseFloat(document.getElementById('editAmount').value)
     };
+    
+    // Asegurar que el UID se mantiene o se añade
+    if (!id) updatedData.uid = currentUser.uid;
 
     saveEditBtn.textContent = "Guardando...";
     saveEditBtn.disabled = true;
@@ -758,8 +772,8 @@ closeEditBtn.addEventListener('click', () => {
 if(searchBtn) {
     searchBtn.addEventListener('click', searchExpenses);
     // Cargar comercios al iniciar
-    loadFilterOptions();
-    loadConfig();
+    // loadFilterOptions(); // Se llama en onAuthStateChanged
+    // loadConfig();
 
     // Eventos botones de vista
     btnViewTotal.addEventListener('click', () => {

@@ -9,10 +9,13 @@
 <body>
 
     <h1>Tikets y Recibos</h1>
+    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
 
     <!-- Botón para volver -->
     <div class="header-actions">
-        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d;">&larr; Volver al Menú</button>
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
     </div>
 
     <div class="card-container">
@@ -107,7 +110,8 @@
             <h2>Nuevo Recibo Manual</h2>
             <div class="form-group">
                 <label for="manualMerchant">Comercio</label>
-                <input type="text" id="manualMerchant" placeholder="Ej: Mercadona">
+                <input type="text" id="manualMerchant" placeholder="Ej: Mercadona" list="merchantSuggestions">
+                <datalist id="merchantSuggestions"></datalist>
             </div>
             <div class="form-group">
                 <label for="manualDate">Fecha</label>
@@ -121,7 +125,8 @@
             </div>
             <div class="form-group">
                 <label for="manualProduct">Concepto</label>
-                <input type="text" id="manualProduct" placeholder="Ej: Pan">
+                <input type="text" id="manualProduct" placeholder="Ej: Pan" list="productSuggestions">
+                <datalist id="productSuggestions"></datalist>
             </div>
             <div class="form-group">
                 <label for="manualAmount">Importe (€)</label>
