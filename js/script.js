@@ -478,12 +478,12 @@ saveDbBtn.addEventListener('click', saveDataToDb);
 
 // --- Lógica para Recibo Manual ---
 
-let merchantCategoryMap = {}; // Mapa para guardar la última categoría por comercio
+let merchantCategoryMap = {}; // Mapa para guardar la categoría más frecuente por comercio
 
 // Función para cargar sugerencias de comercios y productos existentes
 async function loadManualEntrySuggestions() {
     if (!currentUser) return;
-    const datalist = document.getElementById('merchantSuggestions');
+    const merchantDatalist = document.getElementById('merchantSuggestions');
     const productDatalist = document.getElementById('productSuggestions');
     if (!merchantDatalist || !productDatalist) return;
 
@@ -493,21 +493,22 @@ async function loadManualEntrySuggestions() {
         const querySnapshot = await getDocs(q);
         const merchants = new Set();
         const products = new Set();
-        merchantCategoryMap = {}; // Reiniciar mapa
+        const merchantCategoryCounts = {}; // Mapa temporal para contar frecuencias
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
             
-            // Recopilar Comercios y mapear categorías
+            // Recopilar Comercios y contar frecuencias de categorías
             if (data.merchant) {
                 const m = data.merchant.trim();
                 merchants.add(m);
 
-                // Guardar última categoría usada (la más reciente por fecha)
-                if (data.category && data.date) {
-                    if (!merchantCategoryMap[m] || data.date > merchantCategoryMap[m].date) {
-                        merchantCategoryMap[m] = { date: data.date, category: data.category };
+                if (data.category) {
+                    if (!merchantCategoryCounts[m]) {
+                        merchantCategoryCounts[m] = {};
                     }
+                    const category = data.category;
+                    merchantCategoryCounts[m][category] = (merchantCategoryCounts[m][category] || 0) + 1;
                 }
             }
             // Recopilar Productos
@@ -515,6 +516,15 @@ async function loadManualEntrySuggestions() {
                 products.add(data.product.trim());
             }
         });
+
+        // Procesar las cuentas para encontrar la categoría más frecuente por comercio
+        merchantCategoryMap = {}; // Reiniciar mapa final
+        for (const merchant in merchantCategoryCounts) {
+            const categories = merchantCategoryCounts[merchant];
+            // Encontrar la categoría con el recuento más alto
+            const mostFrequentCategory = Object.keys(categories).reduce((a, b) => categories[a] > categories[b] ? a : b);
+            merchantCategoryMap[merchant] = mostFrequentCategory;
+        }
 
         // Rellenar Datalist Comercios
         merchantDatalist.innerHTML = '';
@@ -540,7 +550,7 @@ async function loadManualEntrySuggestions() {
 manualMerchant.addEventListener('input', () => {
     const merchant = manualMerchant.value.trim();
     if (merchantCategoryMap[merchant]) {
-        manualCategory.value = merchantCategoryMap[merchant].category;
+        manualCategory.value = merchantCategoryMap[merchant];
     }
 });
 
