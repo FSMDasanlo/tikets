@@ -35,6 +35,7 @@ console.log("✅ Script consultas.js cargado y Firebase inicializado.");
 
 // Elementos del DOM
 const searchBtn = document.getElementById('searchBtn');
+const clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Botón para limpiar filtros
 const resultsTableBody = document.querySelector('#resultsTable tbody');
 const totalResultsSpan = document.getElementById('totalResults');
 const resultsTableHead = document.querySelector('#resultsTable thead');
@@ -71,6 +72,27 @@ if (resultsTableHead) {
         renderTable();
     });
 }
+
+// Evento para resaltar fila al hacer clic
+resultsTableBody.addEventListener('click', (e) => {
+    // Solo funciona en modo 'detalle'
+    if (currentViewMode !== 'detail') return;
+
+    const row = e.target.closest('tr');
+    // Si no se hace clic en una fila (TR) o se hace en un botón, no hacer nada
+    if (!row || e.target.closest('button')) return;
+
+    // Si la fila ya está seleccionada, la deseleccionamos. Si no, la seleccionamos.
+    if (row.classList.contains('row-selected')) {
+        row.classList.remove('row-selected');
+    } else {
+        // Quitamos la selección de cualquier otra fila que la tuviera
+        const selected = resultsTableBody.querySelector('.row-selected');
+        if (selected) selected.classList.remove('row-selected');
+        // Añadimos la selección a la fila actual
+        row.classList.add('row-selected');
+    }
+});
 
 // Función para cargar comercios y conceptos únicos en los desplegables
 async function loadFilterOptions() {
@@ -203,28 +225,22 @@ async function searchExpenses() {
         // --- FILTRADO EN CLIENTE (JavaScript) ---
         // Refinamos los resultados con el resto de filtros
         const filteredDocs = docs.filter(item => {
-            // 1. Filtro Zona (si no se usó en la query principal)
+            // 1. Filtro Zona
             if (level0 && item.level0 !== level0) return false;
             
-            // Lógica para Devoluciones (Checkbox)
-            if (showReturns) {
-                // Si está marcado, SOLO mostramos importes negativos (devoluciones)
-                // e ignoramos filtros de Categoría, Comercio y Concepto para traer "TODAS"
-                if ((parseFloat(item.amount) || 0) >= 0) return false;
-            } else {
-                // Lógica normal
-                
-                // 2. Filtro Categoría
-                if (category && item.category !== category) return false;
-                
-                // 3. Filtro Comercio (Coincidencia exacta ahora que es desplegable)
-                if (merchant && item.merchant !== merchant) return false;
-                
-                // 4. Filtro Concepto
-                if (product && item.product !== product) return false;
-            }
+            // 2. Filtro Categoría
+            if (category && item.category !== category) return false;
+            
+            // 3. Filtro Comercio
+            if (merchant && item.merchant !== merchant) return false;
+            
+            // 4. Filtro Concepto
+            if (product && item.product !== product) return false;
 
-            // 5. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
+            // 5. Filtro Devoluciones (si está marcado)
+            if (showReturns && (parseFloat(item.amount) || 0) >= 0) return false;
+
+            // 6. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
             if (dateStart || dateEnd) {
                 let itemDateStr = item.date;
                 // Si la fecha guardada es antigua (DD/MM/YYYY), la convertimos para comparar
@@ -257,6 +273,29 @@ async function searchExpenses() {
         console.error("❌ Error consultando:", error);
         resultsTableBody.innerHTML = `<tr><td colspan="7" style="color:red; text-align:center; padding: 20px;">Error: ${error.message}<br>Revisa la consola (F12) para más detalles.</td></tr>`;
     }
+}
+
+// Función para limpiar los filtros y los resultados
+function clearFilters() {
+    document.getElementById('filterLevel0').value = '';
+    document.getElementById('filterMerchant').value = '';
+    document.getElementById('filterProduct').value = '';
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterDateStart').value = '';
+    document.getElementById('filterDateEnd').value = '';
+    document.getElementById('filterReturns').checked = false;
+
+    // Limpiar la tabla, gráfico y estadísticas
+    resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Pulsa "Buscar" para mostrar los datos.</td></tr>';
+    if (resultsTableFoot) resultsTableFoot.innerHTML = '';
+    totalResultsSpan.textContent = 'Total: 0.00 €';
+    currentFilteredDocs = [];
+    originalFilteredDocs = [];
+    if (expenseChart) {
+        expenseChart.destroy();
+        expenseChart = null;
+    }
+    updateStats();
 }
 
 // Función para renderizar la tabla (separada de la búsqueda)
@@ -771,6 +810,10 @@ closeEditBtn.addEventListener('click', () => {
 // Event Listeners
 if(searchBtn) {
     searchBtn.addEventListener('click', searchExpenses);
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearFilters);
+    }
     // Cargar comercios al iniciar
     // loadFilterOptions(); // Se llama en onAuthStateChanged
     // loadConfig();
