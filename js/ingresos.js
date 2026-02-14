@@ -4,6 +4,80 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
 console.log("🚀 Iniciando script de ingresos...");
 
+// --- FUNCIÓN DE ALERTA PERSONALIZADA ---
+function showCustomAlert(message, type = 'neutral') {
+    let alertBox = document.getElementById('customAlert');
+    if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.id = 'customAlert';
+        alertBox.className = 'custom-alert';
+        document.body.appendChild(alertBox);
+    }
+    alertBox.textContent = message;
+    alertBox.className = 'custom-alert'; // Reset clases
+    if (type === 'success') alertBox.classList.add('success');
+    if (type === 'error') alertBox.classList.add('error');
+    
+    void alertBox.offsetWidth; // Forzar reflow
+    alertBox.classList.add('show');
+    setTimeout(() => alertBox.classList.remove('show'), 2000);
+}
+
+// --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('customConfirmModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'customConfirmModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
+                    <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="confirmBtnYes" class="btn-save" style="background-color: #dc3545; width: auto; margin: 0; min-width: 100px;">Sí</button>
+                        <button id="confirmBtnNo" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">No</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('confirmMessage');
+        const btnYes = document.getElementById('confirmBtnYes');
+        const btnNo = document.getElementById('confirmBtnNo');
+
+        msgElement.innerHTML = message.replace(/\n/g, '<br>');
+        
+        // 1. Mostrar modal
+        modal.style.display = 'flex';
+        
+        // 2. Forzar reflow
+        void modal.offsetWidth;
+        
+        // 3. Animar entrada
+        modal.classList.add('show');
+
+        const newBtnYes = btnYes.cloneNode(true);
+        const newBtnNo = btnNo.cloneNode(true);
+        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+        // 4. Enfocar botón Sí
+        newBtnYes.focus();
+
+        const closeModal = (result) => {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
+        };
+
+        newBtnYes.addEventListener('click', () => closeModal(true));
+        newBtnNo.addEventListener('click', () => closeModal(false));
+    });
+}
+
 // --- CONFIGURACIÓN DE FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
@@ -62,6 +136,14 @@ onAuthStateChanged(auth, (user) => {
         if (addDate && !addDate.value) {
             addDate.value = new Date().toISOString().split('T')[0];
         }
+
+        // Leer parámetros de URL para filtros (si vienen desde Consultas)
+        const urlParams = new URLSearchParams(window.location.search);
+        const startParam = urlParams.get('start');
+        const endParam = urlParams.get('end');
+        
+        if (startParam && filterDateStart) filterDateStart.value = startParam;
+        if (endParam && filterDateEnd) filterDateEnd.value = endParam;
         
         // Cargar datos iniciales
         searchIncomes(); 
@@ -78,7 +160,7 @@ if (btnAddIncome) {
         console.log("🖱️ Botón 'Guardar Ingreso' pulsado");
 
         if (!currentUser) {
-            alert("Error: No hay usuario identificado.");
+            showCustomAlert("Error: No hay usuario identificado.", "error");
             return;
         }
 
@@ -88,7 +170,7 @@ if (btnAddIncome) {
         const amount = parseFloat(addAmount.value);
 
         if (!date || !bank || !concept || isNaN(amount)) {
-            alert("⚠️ Por favor, rellena todos los campos correctamente (Fecha, Banco, Concepto e Importe).");
+            showCustomAlert("⚠️ Rellena todos los campos correctamente.", "error");
             return;
         }
 
@@ -108,7 +190,7 @@ if (btnAddIncome) {
             });
 
             console.log("✅ Guardado exitoso");
-            alert("✅ ¡Ingreso guardado correctamente en la base de datos!");
+            showCustomAlert("✅ Ingreso guardado correctamente.", "success");
             
             // Limpiar campos
             addBank.value = '';
@@ -124,7 +206,7 @@ if (btnAddIncome) {
 
         } catch (error) {
             console.error("❌ Error al guardar ingreso:", error);
-            alert("❌ Error al guardar: " + error.message);
+            showCustomAlert("❌ Error al guardar: " + error.message, "error");
         } finally {
             btnAddIncome.disabled = false;
             btnAddIncome.textContent = "Guardar Ingreso";
@@ -229,14 +311,14 @@ function renderTable(data) {
 
 // --- FUNCIÓN 3: BORRAR INGRESO ---
 async function deleteIncome(id) {
-    if (confirm("¿Estás seguro de que quieres eliminar este ingreso?")) {
+    if (await showCustomConfirm("¿Estás seguro de que quieres eliminar este ingreso?")) {
         try {
             await deleteDoc(doc(db, "incomes", id));
-            alert("Registro eliminado.");
+            showCustomAlert("Registro eliminado.", "success");
             searchIncomes(); // Recargar tabla
         } catch (error) {
             console.error("Error al borrar:", error);
-            alert("Error al borrar: " + error.message);
+            showCustomAlert("Error al borrar: " + error.message, "error");
         }
     }
 }
@@ -285,7 +367,7 @@ if (saveIncomeEditBtn) {
         const amount = parseFloat(editIncomeAmount.value);
 
         if (!date || !bank || !concept || isNaN(amount)) {
-            alert("Por favor, rellena todos los campos.");
+            showCustomAlert("Por favor, rellena todos los campos.", "error");
             return;
         }
 
@@ -302,19 +384,19 @@ if (saveIncomeEditBtn) {
             if (id) {
                 // EDITAR
                 await updateDoc(doc(db, "incomes", id), data);
-                alert("✅ Ingreso actualizado.");
+                showCustomAlert("✅ Ingreso actualizado.", "success");
             } else {
                 // DUPLICAR (CREAR)
                 data.createdAt = new Date();
                 await addDoc(collection(db, "incomes"), data);
-                alert("✅ Nuevo ingreso creado.");
+                showCustomAlert("✅ Nuevo ingreso creado.", "success");
             }
             editIncomeModal.style.display = 'none';
             searchIncomes(); // Recargar tabla
             loadIncomeSuggestions(); // Actualizar autocompletar
         } catch (error) {
             console.error("Error guardando:", error);
-            alert("Error: " + error.message);
+            showCustomAlert("Error: " + error.message, "error");
         } finally {
             saveIncomeEditBtn.disabled = false;
         }

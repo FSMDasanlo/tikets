@@ -64,6 +64,9 @@
                 <button id="searchBtn" class="camera-btn" style="border-radius: 5px; width: auto; padding: 0 20px; height: 38px; margin-top: 18px;">
                     Buscar
                 </button>
+                <button id="clearFiltersBtn" class="btn-save" style="background-color: #6c757d; width: auto; margin-top: 18px; padding: 0 15px; margin-left: 10px;">
+                    Limpiar filtros
+                </button>
             </div>
         </div>
 
@@ -71,7 +74,11 @@
         <div class="table-container" style="margin-top: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h3>Resultados</h3>
-                <span id="totalResults" style="font-weight: bold; font-size: 1.2rem; color: #007bff;">Total: 0.00 €</span>
+                <div>
+                    <span id="totalIncomes" style="font-weight: bold; font-size: 1.2rem; color: #28a745; margin-right: 15px; cursor: pointer;" title="Ver detalle de Ingresos">Ingresos: 0.00 €</span>
+                    <span id="totalResults" style="font-weight: bold; font-size: 1.2rem; color: #007bff; margin-right: 15px;">Gastos: 0.00 €</span>
+                    <span id="totalBalance" style="font-weight: bold; font-size: 1.2rem; color: #333;">Balance: 0.00 €</span>
+                </div>
             </div>
             <table id="resultsTable">
                 <thead>

@@ -18,6 +18,61 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
 
+// --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('customConfirmModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'customConfirmModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
+                    <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="confirmBtnYes" class="btn-save" style="background-color: #dc3545; width: auto; margin: 0; min-width: 100px;">Sí</button>
+                        <button id="confirmBtnNo" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">No</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('confirmMessage');
+        const btnYes = document.getElementById('confirmBtnYes');
+        const btnNo = document.getElementById('confirmBtnNo');
+
+        msgElement.innerHTML = message.replace(/\n/g, '<br>');
+        
+        // 1. Mostrar modal
+        modal.style.display = 'flex';
+        
+        // 2. Forzar reflow
+        void modal.offsetWidth;
+        
+        // 3. Animar entrada
+        modal.classList.add('show');
+
+        const newBtnYes = btnYes.cloneNode(true);
+        const newBtnNo = btnNo.cloneNode(true);
+        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+        // 4. Enfocar botón Sí
+        newBtnYes.focus();
+
+        const closeModal = (result) => {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
+        };
+
+        newBtnYes.addEventListener('click', () => closeModal(true));
+        newBtnNo.addEventListener('click', () => closeModal(false));
+    });
+}
+
 const userEmailSpan = document.getElementById('userEmail');
 const newPasswordInput = document.getElementById('newPassword');
 const confirmPasswordInput = document.getElementById('confirmPassword');
@@ -137,7 +192,7 @@ if (btnImportData && importFileInput) {
         const file = e.target.files[0];
         if (!file) return;
 
-        if (!confirm("⚠️ ATENCIÓN: Al importar, se añadirán los datos del archivo a tu cuenta.\nSi ya existen registros con el mismo ID, se actualizarán.\n\n¿Quieres continuar?")) {
+        if (!(await showCustomConfirm("⚠️ ATENCIÓN: Al importar, se añadirán los datos del archivo a tu cuenta.\nSi ya existen registros con el mismo ID, se actualizarán.\n\n¿Quieres continuar?"))) {
             importFileInput.value = '';
             return;
         }
@@ -205,11 +260,9 @@ if (btnImportData && importFileInput) {
 
 // --- ELIMINAR CUENTA ---
 btnDeleteAccount.addEventListener('click', async () => {
-    const confirm1 = confirm("⚠️ ¿ESTÁS SEGURO?\n\nEsta acción eliminará tu cuenta y TODOS tus datos (tickets, categorías, zonas) permanentemente.");
-    if (!confirm1) return;
+    if (!(await showCustomConfirm("⚠️ ¿ESTÁS SEGURO?\n\nEsta acción eliminará tu cuenta y TODOS tus datos permanentemente."))) return;
 
-    const confirm2 = confirm("⚠️ ÚLTIMA ADVERTENCIA\n\nNo podrás recuperar nada. ¿Confirmas el borrado?");
-    if (!confirm2) return;
+    if (!(await showCustomConfirm("⚠️ ÚLTIMA ADVERTENCIA\n\nNo podrás recuperar nada. ¿Confirmas el borrado?"))) return;
 
     try {
         btnDeleteAccount.disabled = true;

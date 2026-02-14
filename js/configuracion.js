@@ -2,6 +2,81 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+// --- FUNCIÓN DE ALERTA PERSONALIZADA ---
+function showCustomAlert(message, type = 'neutral') {
+    let alertBox = document.getElementById('customAlert');
+    if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.id = 'customAlert';
+        alertBox.className = 'custom-alert';
+        document.body.appendChild(alertBox);
+    }
+    alertBox.textContent = message;
+    alertBox.className = 'custom-alert'; // Reset clases
+    if (type === 'success') alertBox.classList.add('success');
+    if (type === 'error') alertBox.classList.add('error');
+    
+    void alertBox.offsetWidth; // Forzar reflow
+    alertBox.classList.add('show');
+    setTimeout(() => alertBox.classList.remove('show'), 2000);
+}
+
+// --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('customConfirmModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'customConfirmModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998'; // Justo debajo del alert (9999)
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
+                    <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="confirmBtnYes" class="btn-save" style="background-color: #dc3545; width: auto; margin: 0; min-width: 100px;">Sí</button>
+                        <button id="confirmBtnNo" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">No</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('confirmMessage');
+        const btnYes = document.getElementById('confirmBtnYes');
+        const btnNo = document.getElementById('confirmBtnNo');
+
+        msgElement.innerHTML = message.replace(/\n/g, '<br>'); // Permitir saltos de línea
+        
+        // 1. Mostrar modal
+        modal.style.display = 'flex';
+        
+        // 2. Forzar reflow
+        void modal.offsetWidth;
+        
+        // 3. Animar entrada
+        modal.classList.add('show');
+
+        // Clonar botones para eliminar eventos anteriores
+        const newBtnYes = btnYes.cloneNode(true);
+        const newBtnNo = btnNo.cloneNode(true);
+        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+        // 4. Enfocar botón Sí
+        newBtnYes.focus();
+
+        const closeModal = (result) => {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
+        };
+
+        newBtnYes.addEventListener('click', () => closeModal(true));
+        newBtnNo.addEventListener('click', () => closeModal(false));
+    });
+}
+
 // --- CONFIGURACIÓN DE FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
@@ -144,7 +219,7 @@ async function addItem(inputElement, collectionName, listElement) {
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
-            alert(`El elemento "${finalName}" ya existe.`);
+            showCustomAlert(`El elemento "${finalName}" ya existe.`, "error");
             return;
         }
 
@@ -160,7 +235,7 @@ async function addItem(inputElement, collectionName, listElement) {
         loadCollection(collectionName, listElement); // Recargar lista
     } catch (error) {
         console.error("Error añadiendo:", error);
-        alert("Error al añadir: " + error.message);
+        showCustomAlert("Error al añadir: " + error.message, "error");
     }
 }
 
@@ -177,24 +252,24 @@ async function deleteItem(id, name, collectionName, listElement) {
             const snapshot = await getDocs(q);
             
             if (!snapshot.empty) {
-                alert(`⚠️ No puedes borrar la categoría "${name}" porque se está usando en ${snapshot.size} tickets.\n\nPor favor, asigna otra categoría a esos tickets antes de borrarla.`);
+                showCustomAlert(`⚠️ Categoría en uso (${snapshot.size} tickets). No se puede borrar.`, "error");
                 return; // Cancelamos el borrado
             }
         } catch (error) {
             console.error("Error verificando uso de categoría:", error);
-            alert("Error al verificar si la categoría está en uso. Revisa la consola.");
+            showCustomAlert("Error al verificar uso. Revisa consola.", "error");
             return;
         }
     }
 
-    if (!confirm(`¿Seguro que quieres eliminar "${name}"?`)) return;
+    if (!(await showCustomConfirm(`¿Seguro que quieres eliminar "${name}"?`))) return;
 
     try {
         await deleteDoc(doc(db, collectionName, id));
         loadCollection(collectionName, listElement);
     } catch (error) {
         console.error("Error borrando:", error);
-        alert("Error al borrar: " + error.message);
+        showCustomAlert("Error al borrar: " + error.message, "error");
     }
 }
 
@@ -252,7 +327,7 @@ saveConfigEditBtn.addEventListener('click', async () => {
                     batch.update(doc.ref, { category: finalName });
                 });
                 await batch.commit();
-                alert(`✅ Categoría actualizada. Se han modificado ${querySnapshot.size} tickets que la usaban.`);
+                showCustomAlert(`✅ Categoría actualizada en ${querySnapshot.size} tickets.`, "success");
             }
         }
         
@@ -263,7 +338,7 @@ saveConfigEditBtn.addEventListener('click', async () => {
 
     } catch (error) {
         console.error("Error actualizando:", error);
-        alert("Error al actualizar: " + error.message);
+        showCustomAlert("Error al actualizar: " + error.message, "error");
     }
 });
 
@@ -301,7 +376,7 @@ if (newCategoryInput) {
 // --- MIGRACIÓN DE DATOS ---
 if (migrateBtn) {
     migrateBtn.addEventListener('click', async () => {
-        if (!confirm("⚠️ ATENCIÓN ⚠️\n\nEsta acción buscará TODOS los gastos, categorías y zonas que NO tengan dueño (creados antes del login) y los asignará a TU usuario actual.\n\n¿Quieres continuar?")) {
+        if (!(await showCustomConfirm("⚠️ ATENCIÓN ⚠️\n\nEsta acción buscará TODOS los gastos, categorías y zonas que NO tengan dueño y los asignará a TU usuario actual.\n\n¿Quieres continuar?"))) {
             return;
         }
 
@@ -325,13 +400,13 @@ if (migrateBtn) {
                 }
             }
 
-            alert(`✅ Migración completada con éxito.\n\nSe han recuperado y asignado ${totalUpdated} registros a tu cuenta.`);
+            showCustomAlert(`✅ Migración completada. ${totalUpdated} registros asignados.`, "success");
             // Recargar la página para ver los cambios
             location.reload();
 
         } catch (error) {
             console.error("Error en migración:", error);
-            alert("Ocurrió un error durante la migración: " + error.message);
+            showCustomAlert("Error en migración: " + error.message, "error");
             migrateBtn.disabled = false;
             migrateBtn.textContent = "Importar Datos Antiguos";
         }

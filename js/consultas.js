@@ -33,11 +33,87 @@ onAuthStateChanged(auth, (user) => {
 
 console.log("✅ Script consultas.js cargado y Firebase inicializado.");
 
+// --- FUNCIÓN DE ALERTA PERSONALIZADA ---
+function showCustomAlert(message, type = 'neutral') {
+    let alertBox = document.getElementById('customAlert');
+    if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.id = 'customAlert';
+        alertBox.className = 'custom-alert';
+        document.body.appendChild(alertBox);
+    }
+    alertBox.textContent = message;
+    alertBox.className = 'custom-alert'; // Reset clases
+    if (type === 'success') alertBox.classList.add('success');
+    if (type === 'error') alertBox.classList.add('error');
+    
+    void alertBox.offsetWidth; // Forzar reflow
+    alertBox.classList.add('show');
+    setTimeout(() => alertBox.classList.remove('show'), 2000);
+}
+
+// --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('customConfirmModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'customConfirmModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
+                    <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="confirmBtnYes" class="btn-save" style="background-color: #dc3545; width: auto; margin: 0; min-width: 100px;">Sí</button>
+                        <button id="confirmBtnNo" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">No</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('confirmMessage');
+        const btnYes = document.getElementById('confirmBtnYes');
+        const btnNo = document.getElementById('confirmBtnNo');
+
+        msgElement.innerHTML = message.replace(/\n/g, '<br>');
+        
+        // 1. Mostrar modal (display flex)
+        modal.style.display = 'flex';
+        
+        // 2. Forzar reflow para que la transición CSS funcione
+        void modal.offsetWidth;
+        
+        // 3. Añadir clase para animación de entrada
+        modal.classList.add('show');
+
+        const newBtnYes = btnYes.cloneNode(true);
+        const newBtnNo = btnNo.cloneNode(true);
+        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+        // 4. Enfocar botón Sí automáticamente
+        newBtnYes.focus();
+
+        const closeModal = (result) => {
+            modal.classList.remove('show'); // Iniciar animación salida
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300); // Esperar transición
+        };
+
+        newBtnYes.addEventListener('click', () => closeModal(true));
+        newBtnNo.addEventListener('click', () => closeModal(false));
+    });
+}
+
 // Elementos del DOM
 const searchBtn = document.getElementById('searchBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Botón para limpiar filtros
 const resultsTableBody = document.querySelector('#resultsTable tbody');
 const totalResultsSpan = document.getElementById('totalResults');
+const totalIncomesSpan = document.getElementById('totalIncomes'); // Nuevo span para ingresos
+const totalBalanceSpan = document.getElementById('totalBalance'); // Nuevo span para balance
 const resultsTableHead = document.querySelector('#resultsTable thead');
 const resultsTableFoot = document.querySelector('#resultsTable tfoot');
 const btnViewTotal = document.getElementById('btnViewTotal');
@@ -45,6 +121,7 @@ const btnViewDetail = document.getElementById('btnViewDetail');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
+let currentTotalIncome = 0; // Variable global para almacenar el total de ingresos
 let currentViewMode = 'detail'; // 'detail' o 'total'
 let expenseChart = null; // Variable para el gráfico
 let categoryColors = {}; // Mapa de colores por categoría
@@ -206,6 +283,29 @@ async function searchExpenses() {
     const dateEnd = document.getElementById('filterDateEnd').value;
     const showReturns = document.getElementById('filterReturns').checked;
 
+    // --- CALCULAR INGRESOS (En base a fechas) ---
+    if (totalIncomesSpan) {
+        totalIncomesSpan.textContent = 'Ingresos: ...';
+        if (totalBalanceSpan) totalBalanceSpan.textContent = 'Balance: ...';
+        try {
+            const qIncome = query(collection(db, "incomes"), where("uid", "==", currentUser.uid));
+            const incomeSnap = await getDocs(qIncome);
+            let incomeTotal = 0;
+            incomeSnap.forEach(doc => {
+                const data = doc.data();
+                if (dateStart && data.date < dateStart) return;
+                if (dateEnd && data.date > dateEnd) return;
+                incomeTotal += parseFloat(data.amount) || 0;
+            });
+            currentTotalIncome = incomeTotal;
+            totalIncomesSpan.textContent = `Ingresos: ${incomeTotal.toFixed(2)} €`;
+        } catch (err) {
+            console.error("Error calculando ingresos:", err);
+            currentTotalIncome = 0;
+            totalIncomesSpan.textContent = 'Ingresos: 0.00 €';
+        }
+    }
+
     try {
         let q = collection(db, "expenses");
         
@@ -288,7 +388,13 @@ function clearFilters() {
     // Limpiar la tabla, gráfico y estadísticas
     resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Pulsa "Buscar" para mostrar los datos.</td></tr>';
     if (resultsTableFoot) resultsTableFoot.innerHTML = '';
-    totalResultsSpan.textContent = 'Total: 0.00 €';
+    totalResultsSpan.textContent = 'Gastos: 0.00 €';
+    if(totalIncomesSpan) totalIncomesSpan.textContent = 'Ingresos: 0.00 €';
+    if(totalBalanceSpan) {
+        totalBalanceSpan.textContent = 'Balance: 0.00 €';
+        totalBalanceSpan.style.color = '#333';
+    }
+    currentTotalIncome = 0;
     currentFilteredDocs = [];
     originalFilteredDocs = [];
     if (expenseChart) {
@@ -306,7 +412,7 @@ function renderTable() {
 
     if (currentFilteredDocs.length === 0) {
         resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">⚠️ No se encontraron resultados con estos filtros.</td></tr>';
-        totalResultsSpan.textContent = 'Total: 0.00 €';
+        totalResultsSpan.textContent = 'Gastos: 0.00 €';
         updateStats(); // Actualizar estadísticas a 0
         return;
     }
@@ -538,7 +644,14 @@ function renderTable() {
         `;
     }
 
-        totalResultsSpan.textContent = `Total: ${totalAmount.toFixed(2)} €`;
+        totalResultsSpan.textContent = `Gastos: ${totalAmount.toFixed(2)} €`;
+
+        // Actualizar Balance
+        if (totalBalanceSpan) {
+            const balance = currentTotalIncome - totalAmount;
+            totalBalanceSpan.textContent = `Balance: ${balance.toFixed(2)} €`;
+            totalBalanceSpan.style.color = balance >= 0 ? '#28a745' : '#dc3545';
+        }
 
         // Añadir eventos a los botones generados
         document.querySelectorAll('.btn-delete').forEach(btn => {
@@ -681,31 +794,31 @@ function updateStats() {
 
 // Función para borrar
 async function deleteExpense(id) {
-    if (confirm("¿Estás seguro de que quieres eliminar este registro permanentemente?")) {
+    if (await showCustomConfirm("¿Estás seguro de que quieres eliminar este registro permanentemente?")) {
         try {
             await deleteDoc(doc(db, "expenses", id));
-            alert("Registro eliminado.");
+            showCustomAlert("Registro eliminado.", "success");
             searchExpenses(); // Recargar tabla
         } catch (error) {
             console.error("Error al borrar:", error);
-            alert("Error al borrar el registro: " + error.message);
+            showCustomAlert("Error al borrar: " + error.message, "error");
         }
     }
 }
 
 // Función para borrar un GRUPO de registros (Ticket completo)
 async function deleteGroup(ids) {
-    if (confirm(`¿Estás seguro de que quieres eliminar este ticket completo (${ids.length} productos)?`)) {
+    if (await showCustomConfirm(`¿Estás seguro de que quieres eliminar este ticket completo (${ids.length} productos)?`)) {
         try {
             // Borramos uno a uno (Firestore batch sería mejor, pero loop es más simple aquí)
             for (const id of ids) {
                 await deleteDoc(doc(db, "expenses", id));
             }
-            alert("Ticket eliminado correctamente.");
+            showCustomAlert("Ticket eliminado correctamente.", "success");
             searchExpenses(); // Recargar tabla
         } catch (error) {
             console.error("Error al borrar grupo:", error);
-            alert("Error al borrar el ticket: " + error.message);
+            showCustomAlert("Error al borrar ticket: " + error.message, "error");
         }
     }
 }
@@ -786,18 +899,18 @@ saveEditBtn.addEventListener('click', async () => {
             // MODO EDICIÓN
             const docRef = doc(db, "expenses", id);
             await updateDoc(docRef, updatedData);
-            alert("Registro actualizado correctamente.");
+            showCustomAlert("Registro actualizado correctamente.", "success");
         } else {
             // MODO DUPLICACIÓN (Crear nuevo)
             await addDoc(collection(db, "expenses"), updatedData);
-            alert("Nuevo gasto creado correctamente.");
+            showCustomAlert("Nuevo gasto creado correctamente.", "success");
         }
         
         editModalOverlay.style.display = 'none';
         searchExpenses(); // Recargar tabla
     } catch (error) {
         console.error("Error al guardar:", error);
-        alert("Error al guardar los cambios: " + error.message);
+        showCustomAlert("Error al guardar: " + error.message, "error");
     } finally {
         saveEditBtn.disabled = false;
     }
@@ -830,5 +943,14 @@ if(searchBtn) {
         btnViewDetail.style.backgroundColor = '#0056b3'; // Oscurecer activo
         btnViewTotal.style.backgroundColor = '#17a2b8'; // Reset otro
         renderTable();
+    });
+}
+
+// Evento clic en Ingresos para ir a la página de gestión con filtros
+if (totalIncomesSpan) {
+    totalIncomesSpan.addEventListener('click', () => {
+        const start = document.getElementById('filterDateStart').value;
+        const end = document.getElementById('filterDateEnd').value;
+        window.location.href = `ingresos.html?start=${start}&end=${end}`;
     });
 }

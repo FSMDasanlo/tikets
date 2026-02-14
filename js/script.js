@@ -3,6 +3,80 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getFirestore, collection, getDocs, query, where, writeBatch, doc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+// --- FUNCIÓN DE ALERTA PERSONALIZADA ---
+function showCustomAlert(message, type = 'neutral') {
+    let alertBox = document.getElementById('customAlert');
+    if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.id = 'customAlert';
+        alertBox.className = 'custom-alert';
+        document.body.appendChild(alertBox);
+    }
+    alertBox.textContent = message;
+    alertBox.className = 'custom-alert'; // Reset clases
+    if (type === 'success') alertBox.classList.add('success');
+    if (type === 'error') alertBox.classList.add('error');
+    
+    void alertBox.offsetWidth; // Forzar reflow
+    alertBox.classList.add('show');
+    setTimeout(() => alertBox.classList.remove('show'), 2000);
+}
+
+// --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('customConfirmModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'customConfirmModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
+                    <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="confirmBtnYes" class="btn-save" style="background-color: #dc3545; width: auto; margin: 0; min-width: 100px;">Sí</button>
+                        <button id="confirmBtnNo" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">No</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('confirmMessage');
+        const btnYes = document.getElementById('confirmBtnYes');
+        const btnNo = document.getElementById('confirmBtnNo');
+
+        msgElement.innerHTML = message.replace(/\n/g, '<br>');
+        
+        // 1. Mostrar modal
+        modal.style.display = 'flex';
+        
+        // 2. Forzar reflow
+        void modal.offsetWidth;
+        
+        // 3. Animar entrada
+        modal.classList.add('show');
+
+        const newBtnYes = btnYes.cloneNode(true);
+        const newBtnNo = btnNo.cloneNode(true);
+        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+        // 4. Enfocar botón Sí
+        newBtnYes.focus();
+
+        const closeModal = (result) => {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
+        };
+
+        newBtnYes.addEventListener('click', () => closeModal(true));
+        newBtnNo.addEventListener('click', () => closeModal(false));
+    });
+}
+
 // ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ⚠️
 const firebaseConfig = {
   apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
@@ -123,8 +197,8 @@ function clearTable() {
 }
 
 // Evento para el botón de Eliminar Todo
-clearTableBtn.addEventListener('click', () => {
-    if (ticketsTableBody.children.length > 0 && confirm("¿Estás seguro de que quieres borrar todos los datos de la tabla?")) {
+clearTableBtn.addEventListener('click', async () => {
+    if (ticketsTableBody.children.length > 0 && await showCustomConfirm("¿Estás seguro de que quieres borrar todos los datos de la tabla?")) {
         clearTable();
     }
 });
@@ -146,7 +220,7 @@ async function saveDataToDb() {
     const date = globalDateInput.value.trim();
 
     if (!merchant || !date) {
-        alert("Por favor, rellena el Comercio y la Fecha antes de guardar.");
+        showCustomAlert("Rellena Comercio y Fecha antes de guardar.", "error");
         return;
     }
 
@@ -195,7 +269,7 @@ async function saveDataToDb() {
             
             // Si el total coincide (con margen de error), avisamos
             if (Math.abs(storedTotal - currentTotal) < 0.05) {
-                const confirmSave = confirm(
+                const confirmSave = await showCustomConfirm(
                     `⚠️ POSIBLE DUPLICADO DETECTADO EN LA NUBE ⚠️\n\n` +
                     `Ya tienes guardados datos para:\n` +
                     `Comercio: ${merchant}\n` +
@@ -223,16 +297,16 @@ async function saveDataToDb() {
         await batch.commit();
 
         console.log("Guardado en Firestore:", dataToSave);
-        alert(`✅ Se han guardado ${dataToSave.length} registros en la nube correctamente.`);
+        showCustomAlert(`✅ ${dataToSave.length} registros guardados en la nube.`, "success");
         
         clearTable();
 
     } catch (error) {
         console.error("Error al guardar en Firestore:", error);
         if (error.code === 'permission-denied') {
-            alert("❌ PERMISO DENEGADO: Las reglas de seguridad de Firebase están bloqueando el acceso. \n\nVe a la consola de Firebase > Firestore > Reglas y cambia 'if false' por 'if true'.");
+            showCustomAlert("❌ PERMISO DENEGADO: Revisa reglas de Firebase.", "error");
         } else {
-            alert("❌ Error al guardar en la base de datos. Revisa la consola para más detalles.");
+            showCustomAlert("❌ Error al guardar. Revisa la consola.", "error");
         }
     }
 }
@@ -242,7 +316,7 @@ async function processFile(file) {
 
     // Comprobar si hay datos sin guardar
     if (ticketsTableBody.children.length > 0) {
-        const wantToSave = confirm("Hay datos de un ticket anterior sin guardar.\n\n¿Quieres GUARDARLOS antes de procesar el nuevo?\n\n[Aceptar] = Guardar y continuar\n[Cancelar] = No guardar (Borrar) y continuar");
+        const wantToSave = await showCustomConfirm("Hay datos de un ticket anterior sin guardar.\n\n¿Quieres GUARDARLOS antes de procesar el nuevo?");
         
         if (wantToSave) {
             await saveDataToDb(); // Esperamos a que se guarde en la nube
@@ -352,7 +426,7 @@ cameraBtn.addEventListener('click', async () => {
         cameraOverlay.style.display = 'flex';
     } catch (err) {
         console.error("Error al acceder a la cámara:", err);
-        alert("No se pudo acceder a la cámara. Verifica los permisos.");
+        showCustomAlert("No se pudo acceder a la cámara.", "error");
     }
 });
 
@@ -577,7 +651,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
     const level0 = globalLevel0Input.value; // Usamos la Zona seleccionada en la pantalla principal
 
     if (!merchant || !date || !product || isNaN(amount)) {
-        alert("Por favor, rellena todos los campos.");
+        showCustomAlert("Por favor, rellena todos los campos.", "error");
         return;
     }
 
@@ -597,7 +671,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
         
         await addDoc(collection(db, "expenses"), data);
         
-        alert("✅ Gasto guardado correctamente en la base de datos.");
+        showCustomAlert("✅ Gasto guardado correctamente.", "success");
         
         // Limpiar y cerrar
         manualMerchant.value = '';
@@ -606,7 +680,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
         manualEntryOverlay.style.display = 'none';
     } catch (error) {
         console.error("Error guardando manual:", error);
-        alert("Error al guardar: " + error.message);
+        showCustomAlert("Error al guardar: " + error.message, "error");
     } finally {
         saveManualDirectBtn.disabled = false;
         saveManualDirectBtn.textContent = "Guardar en BD";

@@ -508,3 +508,57 @@ tfoot td {
     max-width: 350px;
     text-align: center;
 }
+
+/* --- CUSTOM ALERT (TOAST) --- */
+.custom-alert {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px); /* Empieza oculto arriba */
+    background-color: #333;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 9999;
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Efecto rebote */
+    font-weight: 500;
+    text-align: center;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+.custom-alert.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.custom-alert.success {
+    background-color: #28a745;
+    border-left: 5px solid #155724;
+}
+
+.custom-alert.error {
+    background-color: #dc3545;
+    border-left: 5px solid #721c24;
+}
+
+/* --- ANIMACIÓN MODAL CONFIRMACIÓN --- */
+#customConfirmModal {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#customConfirmModal.show {
+    opacity: 1;
+}
+
+#customConfirmModal .modal-content {
+    transform: scale(0.8);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Efecto rebote suave */
+}
+
+#customConfirmModal.show .modal-content {
+    transform: scale(1);
+}
