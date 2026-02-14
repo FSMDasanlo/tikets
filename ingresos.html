@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Ingresos</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <h1>Gestión de Ingresos</h1>
+    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
+    
+    <!-- Botón para volver -->
+    <div class="header-actions">
+        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
+    </div>
+
+    <div class="card-container" style="flex-direction: column; align-items: center;">
+        
+        <!-- SECCIÓN 1: AÑADIR INGRESO -->
+        <div class="card" style="width: 100%; max-width: 800px; cursor: default; transform: none; padding: 20px; border: 1px solid #28a745;">
+            <h2 style="color: #28a745; margin-bottom: 15px;">1. Añadir Nuevo Ingreso</h2>
+            <div class="filters-container" style="justify-content: space-between;">
+                <div class="filter-group" style="flex: 1;">
+                    <label>Fecha</label>
+                    <input type="date" id="addDate">
+                </div>
+                <div class="filter-group" style="flex: 1;">
+                    <label>Banco</label>
+                    <input type="text" id="addBank" placeholder="Ej: BBVA, Santander..." list="bankSuggestions">
+                    <datalist id="bankSuggestions"></datalist>
+                </div>
+                <div class="filter-group" style="flex: 2;">
+                    <label>Concepto</label>
+                    <input type="text" id="addConcept" placeholder="Ej: Nómina, Venta..." list="conceptSuggestions">
+                    <datalist id="conceptSuggestions"></datalist>
+                </div>
+                <div class="filter-group" style="flex: 1;">
+                    <label>Importe (€)</label>
+                    <input type="number" id="addAmount" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <button id="btnAddIncome" class="btn-save" style="background-color: #28a745; margin-top: 20px;">Guardar Ingreso</button>
+        </div>
+
+        <!-- SECCIÓN 2: CONSULTAR -->
+        <div class="card" style="width: 100%; max-width: 800px; cursor: default; transform: none; padding: 20px; margin-top: 20px;">
+            <h2 style="margin-bottom: 15px;">2. Consultar Ingresos</h2>
+            
+            <!-- Filtros -->
+            <div class="filters-container" style="background-color: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <div class="filter-group">
+                    <label>Desde</label>
+                    <input type="date" id="filterDateStart">
+                </div>
+                <div class="filter-group">
+                    <label>Hasta</label>
+                    <input type="date" id="filterDateEnd">
+                </div>
+                <div class="filter-group">
+                    <label>Filtrar por Banco</label>
+                    <input type="text" id="filterBank" placeholder="Contiene...">
+                </div>
+                <div class="filter-group">
+                    <label>Filtrar por Concepto</label>
+                    <input type="text" id="filterConcept" placeholder="Contiene...">
+                </div>
+                <button id="btnSearch" class="camera-btn" style="border-radius: 5px; width: auto; padding: 0 20px; height: 38px; margin-top: 18px;">
+                    Buscar
+                </button>
+                <button id="btnClear" class="btn-save" style="background-color: #6c757d; width: auto; margin-top: 18px; padding: 0 15px;">
+                    Limpiar
+                </button>
+            </div>
+
+            <!-- Total y Tabla -->
+            <div class="table-container" style="margin-top: 20px; padding: 0; box-shadow: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; background-color: #e9ecef; padding: 15px; border-radius: 5px 5px 0 0;">
+                    <h3 style="margin: 0;">Resultados</h3>
+                    <span id="totalIncome" style="font-weight: bold; font-size: 1.2rem; color: #28a745;">Total: 0.00 €</span>
+                </div>
+                <table id="incomeTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Banco</th>
+                            <th>Concepto</th>
+                            <th style="text-align: right;">Importe</th>
+                            <th style="text-align: center;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" style="text-align: center; color: #777;">Pulsa "Buscar" para ver los datos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edición Ingresos -->
+    <div id="editIncomeModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="editIncomeTitle">Editar Ingreso</h2>
+            <input type="hidden" id="editIncomeId">
+            <div class="form-group">
+                <label>Fecha</label>
+                <input type="date" id="editIncomeDate">
+            </div>
+            <div class="form-group">
+                <label>Banco</label>
+                <input type="text" id="editIncomeBank" list="bankSuggestions">
+            </div>
+            <div class="form-group">
+                <label>Concepto</label>
+                <input type="text" id="editIncomeConcept" list="conceptSuggestions">
+            </div>
+            <div class="form-group">
+                <label>Importe (€)</label>
+                <input type="number" id="editIncomeAmount" step="0.01">
+            </div>
+            <div class="modal-actions">
+                <button id="saveIncomeEditBtn" class="btn-save">Guardar Cambios</button>
+                <button id="closeIncomeEditBtn" class="btn-close">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/ingresos.js"></script>
+</body>
+</html>
