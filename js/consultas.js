@@ -110,6 +110,9 @@ function showCustomConfirm(message) {
 // Elementos del DOM
 const searchBtn = document.getElementById('searchBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Botón para limpiar filtros
+const btnPrevMonth = document.getElementById('btnPrevMonth');
+const btnCurrMonth = document.getElementById('btnCurrMonth');
+const btnCurrYear = document.getElementById('btnCurrYear');
 const resultsTableBody = document.querySelector('#resultsTable tbody');
 const totalResultsSpan = document.getElementById('totalResults');
 const totalIncomesSpan = document.getElementById('totalIncomes'); // Nuevo span para ingresos
@@ -920,6 +923,29 @@ closeEditBtn.addEventListener('click', () => {
     editModalOverlay.style.display = 'none';
 });
 
+// Función para establecer rango de fechas (Mes Actual / Anterior)
+function setDateFilter(mode) {
+    const now = new Date();
+    let start, end;
+
+    if (mode === 'current') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (mode === 'previous') {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else if (mode === 'year') {
+        start = new Date(now.getFullYear(), 0, 1);
+        end = new Date(now.getFullYear(), 11, 31);
+    }
+
+    // Formato local YYYY-MM-DD
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
+    document.getElementById('filterDateStart').value = fmt(start);
+    document.getElementById('filterDateEnd').value = fmt(end);
+}
+
 // Event Listeners
 if(searchBtn) {
     searchBtn.addEventListener('click', searchExpenses);
@@ -927,6 +953,26 @@ if(searchBtn) {
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
     }
+
+    if (btnPrevMonth) {
+        btnPrevMonth.addEventListener('click', () => {
+            setDateFilter('previous');
+            searchExpenses();
+        });
+    }
+    if (btnCurrMonth) {
+        btnCurrMonth.addEventListener('click', () => {
+            setDateFilter('current');
+            searchExpenses();
+        });
+    }
+    if (btnCurrYear) {
+        btnCurrYear.addEventListener('click', () => {
+            setDateFilter('year');
+            searchExpenses();
+        });
+    }
+
     // Cargar comercios al iniciar
     // loadFilterOptions(); // Se llama en onAuthStateChanged
     // loadConfig();
