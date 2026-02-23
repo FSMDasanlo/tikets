@@ -77,6 +77,31 @@ function showCustomConfirm(message) {
     });
 }
 
+// --- FUNCIÓN PARA CARGAR SUGERENCIAS DE BANCOS ---
+async function loadBankSuggestions() {
+    if (!currentUser) return;
+    const bankDatalist = document.getElementById('bankSuggestions');
+    if (!bankDatalist) return;
+
+    try {
+        const expensesQuery = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
+        const incomesQuery = query(collection(db, "incomes"), where("uid", "==", currentUser.uid));
+
+        const [expensesSnap, incomesSnap] = await Promise.all([ getDocs(expensesQuery), getDocs(incomesQuery) ]);
+
+        const banks = new Set();
+        expensesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
+        incomesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
+
+        bankDatalist.innerHTML = '';
+        Array.from(banks).sort().forEach(bank => {
+            bankDatalist.innerHTML += `<option value="${bank}"></option>`;
+        });
+    } catch (error) {
+        console.error("Error cargando sugerencias de bancos:", error);
+    }
+}
+
 // ⚠️ PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ⚠️
 const firebaseConfig = {
   apiKey: "AIzaSyAD9gC8MPGCVP89xoFVkJWE0LKStxhCSeQ",
@@ -100,6 +125,7 @@ onAuthStateChanged(auth, (user) => {
         const headerUserDisplay = document.getElementById('headerUserDisplay');
         if(headerUserDisplay) headerUserDisplay.textContent = `Usuario: ${user.email}`;
         loadConfig(); // Cargar configuración solo cuando tenemos usuario
+        loadBankSuggestions(); // Cargar sugerencias de bancos
     } else {
         window.location.href = 'login.html';
     }
@@ -123,6 +149,7 @@ const saveDbBtn = document.getElementById('saveDbBtn');
 const globalMerchantInput = document.getElementById('globalMerchant');
 const globalLevel0Input = document.getElementById('globalLevel0');
 const globalDateInput = document.getElementById('globalDate');
+const globalBankInput = document.getElementById('globalBank');
 const ticketInfoDiv = document.querySelector('.ticket-info');
 
 // Elementos del modal manual
@@ -136,6 +163,7 @@ const manualDate = document.getElementById('manualDate');
 const manualProduct = document.getElementById('manualProduct');
 const manualCategory = document.getElementById('manualCategory');
 const manualAmount = document.getElementById('manualAmount');
+const manualBank = document.getElementById('manualBank');
 
 let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros", "Otros"]; // Fallback por defecto
 
@@ -186,6 +214,7 @@ function clearTable() {
     ticketsTableBody.innerHTML = '';
     globalMerchantInput.value = '';
     globalLevel0Input.value = 'MADRID'; // Restablecer valor por defecto
+    if (globalBankInput) globalBankInput.value = '';
     globalDateInput.value = '';
     tableTotalSpan.textContent = '0.00 €';
     statusMessage.textContent = 'Esperando imagen...';
@@ -217,10 +246,11 @@ async function saveDataToDb() {
 
     const merchant = globalMerchantInput.value.trim();
     const level0 = globalLevel0Input.value;
+    const bank = globalBankInput.value.trim();
     const date = globalDateInput.value.trim();
 
-    if (!merchant || !date) {
-        showCustomAlert("Rellena Comercio y Fecha antes de guardar.", "error");
+    if (!merchant || !date || !bank) {
+        showCustomAlert("Rellena Comercio, Banco y Fecha antes de guardar.", "error");
         return;
     }
 
@@ -240,6 +270,7 @@ async function saveDataToDb() {
             level0: level0,
             merchant: merchant,
             date: date,
+            bank: bank,
             product: cells[0].innerText,
             category: categorySelect.value,
             amount: amountVal, // Guardamos como número
@@ -648,9 +679,10 @@ saveManualDirectBtn.addEventListener('click', async () => {
     const product = manualProduct.value.trim();
     const category = manualCategory.value;
     const amount = parseFloat(manualAmount.value);
+    const bank = manualBank.value.trim();
     const level0 = globalLevel0Input.value; // Usamos la Zona seleccionada en la pantalla principal
 
-    if (!merchant || !date || !product || isNaN(amount)) {
+    if (!merchant || !date || !product || !bank || isNaN(amount)) {
         showCustomAlert("Por favor, rellena todos los campos.", "error");
         return;
     }
@@ -658,6 +690,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
     const data = {
         level0,
         merchant,
+        bank,
         date,
         product,
         category,
@@ -676,6 +709,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
         // Limpiar y cerrar
         manualMerchant.value = '';
         manualProduct.value = '';
+        manualBank.value = '';
         manualAmount.value = '';
         manualEntryOverlay.style.display = 'none';
     } catch (error) {

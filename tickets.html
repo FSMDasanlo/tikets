@@ -67,6 +67,10 @@
                 <input type="text" id="globalMerchant" placeholder="Nombre del comercio">
             </div>
             <div>
+                <label for="globalBank">Banco</label>
+                <input type="text" id="globalBank" list="bankSuggestions" class="ticket-input" placeholder="Banco del pago">
+            </div>
+            <div>
                 <label for="globalDate">Fecha</label>
                 <input type="date" id="globalDate">
             </div>
@@ -114,6 +118,10 @@
                 <datalist id="merchantSuggestions"></datalist>
             </div>
             <div class="form-group">
+                <label for="manualBank">Banco</label>
+                <input type="text" id="manualBank" placeholder="Ej: BBVA" list="bankSuggestions">
+            </div>
+            <div class="form-group">
                 <label for="manualDate">Fecha</label>
                 <input type="date" id="manualDate">
             </div>
@@ -138,6 +146,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Datalist para sugerencias de bancos (usado por varios inputs) -->
+    <datalist id="bankSuggestions"></datalist>
 
     <!-- Librerías y Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>

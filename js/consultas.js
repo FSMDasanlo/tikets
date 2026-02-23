@@ -178,20 +178,26 @@ resultsTableBody.addEventListener('click', (e) => {
 async function loadFilterOptions() {
     const merchantSelect = document.getElementById('filterMerchant');
     const productSelect = document.getElementById('filterProduct');
+    const bankSelect = document.getElementById('filterBank');
     // Indicador de carga
     merchantSelect.innerHTML = '<option value="">Cargando...</option>';
     productSelect.innerHTML = '<option value="">Cargando...</option>';
+    if (bankSelect) bankSelect.innerHTML = '<option value="">Cargando...</option>';
 
     try {
         // Solo cargar opciones de MIS gastos
         const querySnapshot = await getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid)));
         const merchants = new Set();
         const products = new Set();
+        const banks = new Set();
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
             if (data.merchant) {
                 merchants.add(data.merchant.trim());
+            }
+            if (data.bank) {
+                banks.add(data.bank.trim());
             }
         });
         querySnapshot.forEach((doc) => {
@@ -203,6 +209,7 @@ async function loadFilterOptions() {
 
         const sortedMerchants = Array.from(merchants).sort();
         const sortedProducts = Array.from(products).sort();
+        const sortedBanks = Array.from(banks).sort();
 
         merchantSelect.innerHTML = '<option value="">Todos</option>';
         sortedMerchants.forEach(m => {
@@ -219,10 +226,21 @@ async function loadFilterOptions() {
             option.textContent = p;
             productSelect.appendChild(option);
         });
+
+        if (bankSelect) {
+            bankSelect.innerHTML = '<option value="">Todos</option>';
+            sortedBanks.forEach(b => {
+                const option = document.createElement('option');
+                option.value = b;
+                option.textContent = b;
+                bankSelect.appendChild(option);
+            });
+        }
     } catch (error) {
         console.error("Error cargando filtros:", error);
         merchantSelect.innerHTML = '<option value="">Error</option>';
         productSelect.innerHTML = '<option value="">Error</option>';
+        if (bankSelect) bankSelect.innerHTML = '<option value="">Error</option>';
     }
 }
 
@@ -276,12 +294,13 @@ async function loadConfig() {
 // Función principal de búsqueda
 async function searchExpenses() {
     console.log("🔍 Iniciando búsqueda...");
-    resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">⏳ Cargando datos de la nube...</td></tr>';
+    resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">⏳ Cargando datos de la nube...</td></tr>';
     
     const level0 = document.getElementById('filterLevel0').value;
     const merchant = document.getElementById('filterMerchant').value;
     const product = document.getElementById('filterProduct').value;
     const category = document.getElementById('filterCategory').value;
+    const bank = document.getElementById('filterBank').value;
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
     const showReturns = document.getElementById('filterReturns').checked;
@@ -334,6 +353,9 @@ async function searchExpenses() {
             // 2. Filtro Categoría
             if (category && item.category !== category) return false;
             
+            // Filtro Banco
+            if (bank && item.bank !== bank) return false;
+
             // 3. Filtro Comercio
             if (merchant && item.merchant !== merchant) return false;
             
@@ -374,7 +396,7 @@ async function searchExpenses() {
 
     } catch (error) {
         console.error("❌ Error consultando:", error);
-        resultsTableBody.innerHTML = `<tr><td colspan="7" style="color:red; text-align:center; padding: 20px;">Error: ${error.message}<br>Revisa la consola (F12) para más detalles.</td></tr>`;
+        resultsTableBody.innerHTML = `<tr><td colspan="8" style="color:red; text-align:center; padding: 20px;">Error: ${error.message}<br>Revisa la consola (F12) para más detalles.</td></tr>`;
     }
 }
 
@@ -389,7 +411,7 @@ function clearFilters() {
     document.getElementById('filterReturns').checked = false;
 
     // Limpiar la tabla, gráfico y estadísticas
-    resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">Pulsa "Buscar" para mostrar los datos.</td></tr>';
+    resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #666;">Pulsa "Buscar" para mostrar los datos.</td></tr>';
     if (resultsTableFoot) resultsTableFoot.innerHTML = '';
     totalResultsSpan.textContent = 'Gastos: 0.00 €';
     if(totalIncomesSpan) totalIncomesSpan.textContent = 'Ingresos: 0.00 €';
@@ -414,7 +436,7 @@ function renderTable() {
     let totalAmount = 0;
 
     if (currentFilteredDocs.length === 0) {
-        resultsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #666;">⚠️ No se encontraron resultados con estos filtros.</td></tr>';
+        resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #666;">⚠️ No se encontraron resultados con estos filtros.</td></tr>';
         totalResultsSpan.textContent = 'Gastos: 0.00 €';
         updateStats(); // Actualizar estadísticas a 0
         return;
@@ -451,6 +473,7 @@ function renderTable() {
             <tr>
                 <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
+                <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
                 <th data-sort="product" style="cursor: pointer;">Concepto${getSortIcon('product')}</th>
                 <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
@@ -479,6 +502,7 @@ function renderTable() {
             row.innerHTML = `
                 <td>${displayDate}</td>
                 <td>${item.level0 || '-'}</td>
+                <td>${item.bank || '-'}</td>
                 <td>${item.merchant}</td>
                 <td>${item.product}</td>
                 <td>${item.category}</td>
@@ -499,6 +523,7 @@ function renderTable() {
             <tr>
                 <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
+                <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
                 <th>Concepto</th>
                 <th>Categoría</th>
@@ -510,12 +535,13 @@ function renderTable() {
         // Agrupar datos por (Fecha + Comercio + Zona)
         const groups = {};
         currentFilteredDocs.forEach(item => {
-            const key = `${item.date}|${item.merchant}|${item.level0}`;
+            const key = `${item.date}|${item.merchant}|${item.level0}|${item.bank || 'N/A'}`;
             if (!groups[key]) {
                 groups[key] = {
                     date: item.date,
                     merchant: item.merchant,
                     level0: item.level0,
+                    bank: item.bank || 'N/A',
                     amount: 0,
                     ids: [], // Guardamos todos los IDs de este grupo
                     items: [] // Guardamos los items completos para el detalle desplegable
@@ -572,6 +598,7 @@ function renderTable() {
             row.innerHTML = `
                 <td>${displayDate}</td>
                 <td>${group.level0 || '-'}</td>
+                <td>${group.bank === 'N/A' ? '-' : group.bank}</td>
                 <td>${group.merchant}</td>
                 <td style="font-size: 0.9rem; color: #555;">${concepts}</td>
                 <td style="font-size: 0.9rem; color: #555;">${categories}</td>
@@ -588,7 +615,7 @@ function renderTable() {
             detailRow.style.backgroundColor = '#f8f9fa';
 
             let detailsHtml = `
-                <td colspan="7" style="padding: 15px;">
+                <td colspan="8" style="padding: 15px;">
                     <div style="margin-bottom: 5px; font-weight: bold; color: #555;">Detalle de conceptos:</div>
                     <table style="width: 100%; background: white; border: 1px solid #dee2e6; font-size: 0.9rem;">
                         <thead style="background-color: #e9ecef;">
@@ -637,7 +664,7 @@ function renderTable() {
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot) {
-        const colspan = 5; // Ahora ambos modos tienen 5 columnas antes del importe
+        const colspan = 6; // Ahora ambos modos tienen 6 columnas antes del importe
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
@@ -837,6 +864,7 @@ function openEditModal(id, allDocs) {
     document.getElementById('editId').value = id;
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
     document.getElementById('editMerchant').value = item.merchant;
+    document.getElementById('editBank').value = item.bank || '';
     
     // CORRECCIÓN DE FECHA: Si viene en formato antiguo DD/MM/YYYY, convertir a YYYY-MM-DD
     let dateValue = item.date;
@@ -864,6 +892,7 @@ function openDuplicateModal(id, allDocs) {
     document.getElementById('editId').value = ""; // ID vacío indica creación
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
     document.getElementById('editMerchant').value = item.merchant;
+    document.getElementById('editBank').value = item.bank || '';
     
     let dateValue = item.date;
     if (dateValue && dateValue.includes('/')) {
@@ -885,6 +914,7 @@ saveEditBtn.addEventListener('click', async () => {
     const updatedData = {
         level0: document.getElementById('editLevel0').value,
         merchant: document.getElementById('editMerchant').value,
+        bank: document.getElementById('editBank').value.trim(),
         date: document.getElementById('editDate').value,
         product: document.getElementById('editProduct').value,
         category: document.getElementById('editCategory').value,
