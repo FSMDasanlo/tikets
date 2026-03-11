@@ -121,9 +121,11 @@ const resultsTableHead = document.querySelector('#resultsTable thead');
 const resultsTableFoot = document.querySelector('#resultsTable tfoot');
 const btnViewTotal = document.getElementById('btnViewTotal');
 const btnViewDetail = document.getElementById('btnViewDetail');
+const btnViewAccounts = document.getElementById('btnViewAccounts');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
+let currentFilteredIncomes = []; // Almacena los ingresos filtrados actuales
 let currentTotalIncome = 0; // Variable global para almacenar el total de ingresos
 let currentViewMode = 'detail'; // 'detail' o 'total'
 let expenseChart = null; // Variable para el gráfico
@@ -312,14 +314,17 @@ async function searchExpenses() {
         try {
             const qIncome = query(collection(db, "incomes"), where("uid", "==", currentUser.uid));
             const incomeSnap = await getDocs(qIncome);
+            const allIncomes = [];
             let incomeTotal = 0;
             incomeSnap.forEach(doc => {
                 const data = doc.data();
                 if (dateStart && data.date < dateStart) return;
                 if (dateEnd && data.date > dateEnd) return;
                 incomeTotal += parseFloat(data.amount) || 0;
+                allIncomes.push({ id: doc.id, ...doc.data() });
             });
             currentTotalIncome = incomeTotal;
+            currentFilteredIncomes = allIncomes;
             totalIncomesSpan.textContent = `Ingresos: ${incomeTotal.toFixed(2)} €`;
         } catch (err) {
             console.error("Error calculando ingresos:", err);
@@ -432,6 +437,12 @@ function clearFilters() {
 // Función para renderizar la tabla (separada de la búsqueda)
 function renderTable() {
     resultsTableBody.innerHTML = '';
+    
+    // Gestionar visibilidad de totales globales
+    totalResultsSpan.style.display = 'inline';
+    totalIncomesSpan.style.display = 'inline';
+    if (totalBalanceSpan) totalBalanceSpan.style.display = 'inline';
+
     if (resultsTableFoot) resultsTableFoot.innerHTML = ''; // Limpiar pie anterior
     let totalAmount = 0;
 
@@ -1012,14 +1023,157 @@ if(searchBtn) {
         currentViewMode = 'total';
         btnViewTotal.style.backgroundColor = '#138496'; // Oscurecer activo
         btnViewDetail.style.backgroundColor = '#007bff'; // Reset otro
+        if (btnViewAccounts) btnViewAccounts.style.backgroundColor = '#28a745';
         renderTable();
     });
     btnViewDetail.addEventListener('click', () => {
         currentViewMode = 'detail';
         btnViewDetail.style.backgroundColor = '#0056b3'; // Oscurecer activo
         btnViewTotal.style.backgroundColor = '#17a2b8'; // Reset otro
+        if (btnViewAccounts) btnViewAccounts.style.backgroundColor = '#28a745';
         renderTable();
     });
+
+    if (btnViewAccounts) {
+        btnViewAccounts.addEventListener('click', async () => {
+            // 1. Cambiar estado visual y modo
+            currentViewMode = 'accounts';
+            btnViewAccounts.style.backgroundColor = '#218838'; // Oscurecer activo
+            btnViewDetail.style.backgroundColor = '#007bff';
+            btnViewTotal.style.backgroundColor = '#17a2b8';
+
+            // 2. Mostrar totales globales y estado de carga
+            totalResultsSpan.style.display = 'inline';
+            totalIncomesSpan.style.display = 'inline';
+            if (totalBalanceSpan) totalBalanceSpan.style.display = 'inline';
+            
+            totalIncomesSpan.textContent = 'Ingresos: Calculando...';
+            totalResultsSpan.textContent = 'Gastos: Calculando...';
+            if (totalBalanceSpan) totalBalanceSpan.textContent = 'Balance: Calculando...';
+
+            resultsTableHead.innerHTML = `
+                <tr>
+                    <th>Banco</th>
+                    <th style="text-align: right;">Ingresos</th>
+                    <th style="text-align: right;">Gastos</th>
+                    <th style="text-align: right;">Balance</th>
+                </tr>
+            `;
+            resultsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">Cargando balance de cuentas...</td></tr>';
+            if (resultsTableFoot) resultsTableFoot.innerHTML = '';
+
+            try {
+                // 3. Cargar TODOS los datos sin filtros
+                const expensesQuery = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
+                const incomesQuery = query(collection(db, "incomes"), where("uid", "==", currentUser.uid));
+
+                const [expensesSnap, incomesSnap] = await Promise.all([
+                    getDocs(expensesQuery),
+                    getDocs(incomesQuery)
+                ]);
+
+                const allExpenses = [];
+                expensesSnap.forEach(doc => allExpenses.push({ id: doc.id, ...doc.data() }));
+                
+                const allIncomes = [];
+                incomesSnap.forEach(doc => allIncomes.push({ id: doc.id, ...doc.data() }));
+
+                // 4. Procesar y agrupar datos
+                const bankAccounts = {};
+
+                allExpenses.forEach(item => {
+                    const bank = item.bank || 'Sin Banco';
+                    if (!bankAccounts[bank]) {
+                        bankAccounts[bank] = { incomes: 0, expenses: 0, movements: [] };
+                    }
+                    bankAccounts[bank].expenses += parseFloat(item.amount) || 0;
+                    bankAccounts[bank].movements.push({ ...item, type: 'expense' });
+                });
+
+                allIncomes.forEach(item => {
+                    const bank = item.bank || 'Sin Banco';
+                    if (!bankAccounts[bank]) {
+                        bankAccounts[bank] = { incomes: 0, expenses: 0, movements: [] };
+                    }
+                    bankAccounts[bank].incomes += parseFloat(item.amount) || 0;
+                    bankAccounts[bank].movements.push({ ...item, type: 'income' });
+                });
+
+                // 5. Renderizar la tabla de cuentas
+                resultsTableBody.innerHTML = '';
+                if (Object.keys(bankAccounts).length === 0) {
+                    resultsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #777;">No se encontraron movimientos en cuentas bancarias.</td></tr>';
+                    return;
+                }
+
+                // Variables para el total general
+                let totalIncomesGlobal = 0;
+                let totalExpensesGlobal = 0;
+
+                Object.keys(bankAccounts).sort().forEach(bankName => {
+                    const account = bankAccounts[bankName];
+                    const balance = account.incomes - account.expenses;
+
+                    const row = document.createElement('tr');
+                    row.style.cursor = 'pointer';
+                    row.title = 'Haz clic para ver movimientos';
+
+                    // Acumular para el total general
+                    totalIncomesGlobal += account.incomes;
+                    totalExpensesGlobal += account.expenses;
+
+                    row.innerHTML = `
+                        <td style="font-weight: bold;">${bankName}</td>
+                        <td style="text-align: right; color: #28a745;">${account.incomes.toFixed(2)} €</td>
+                        <td style="text-align: right; color: #dc3545;">${account.expenses.toFixed(2)} €</td>
+                        <td style="text-align: right; font-weight: bold; color: ${balance >= 0 ? '#28a745' : '#dc3545'};">${balance.toFixed(2)} €</td>
+                    `;
+
+                    const detailRow = document.createElement('tr');
+                    detailRow.style.display = 'none';
+                    detailRow.style.backgroundColor = '#f8f9fa';
+
+                    let detailsHtml = `<td colspan="4" style="padding: 15px;"><table style="width: 100%; background: white; border: 1px solid #eee; font-size: 0.9rem;"><thead><tr><th>Fecha</th><th>Concepto</th><th style="text-align: right;">Importe</th></tr></thead><tbody>`;
+                    account.movements.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    account.movements.forEach(mov => {
+                        const amount = parseFloat(mov.amount) || 0;
+                        const concept = mov.type === 'expense' ? `${mov.merchant} - ${mov.product}` : mov.concept;
+                        const color = mov.type === 'expense' ? '#dc3545' : '#28a745';
+                        let displayDate = mov.date;
+                        if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                            const [y, m, d] = displayDate.split('-');
+                            displayDate = `${d}-${m}-${y}`;
+                        }
+                        detailsHtml += `<tr><td style="padding: 8px;">${displayDate}</td><td style="padding: 8px;">${concept}</td><td style="padding: 8px; text-align: right; color: ${color};">${mov.type === 'expense' ? '-' : ''}${amount.toFixed(2)} €</td></tr>`;
+                    });
+                    detailsHtml += '</tbody></table></td>';
+                    detailRow.innerHTML = detailsHtml;
+
+                    row.addEventListener('click', () => {
+                        detailRow.style.display = detailRow.style.display === 'none' ? 'table-row' : 'none';
+                    });
+
+                    resultsTableBody.appendChild(row);
+                    resultsTableBody.appendChild(detailRow);
+                });
+
+                // 6. Renderizar los totales en los spans de la cabecera
+                const totalBalanceGlobal = totalIncomesGlobal - totalExpensesGlobal;
+                totalIncomesSpan.textContent = `Ingresos: ${totalIncomesGlobal.toFixed(2)} €`;
+                totalResultsSpan.textContent = `Gastos: ${totalExpensesGlobal.toFixed(2)} €`;
+                if (totalBalanceSpan) {
+                    totalBalanceSpan.textContent = `Balance: ${totalBalanceGlobal.toFixed(2)} €`;
+                    totalBalanceSpan.style.color = totalBalanceGlobal >= 0 ? '#28a745' : '#dc3545';
+                }
+
+                if (resultsTableFoot) resultsTableFoot.innerHTML = '';
+
+            } catch (error) {
+                console.error("Error al cargar el balance de cuentas:", error);
+                resultsTableBody.innerHTML = `<tr><td colspan="4" style="color:red; text-align:center;">Error al cargar el balance: ${error.message}</td></tr>`;
+            }
+        });
+    }
 }
 
 // Evento clic en Ingresos para ir a la página de gestión con filtros
