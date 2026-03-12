@@ -482,14 +482,14 @@ function renderTable() {
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="date" style="cursor: pointer; width: 110px;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
                 <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
-                <th data-sort="product" style="cursor: pointer;">Concepto${getSortIcon('product')}</th>
+                <th data-sort="product" style="cursor: pointer; width: 20%;">Concepto${getSortIcon('product')}</th>
                 <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
                 <th data-sort="amount" style="cursor: pointer;">Importe${getSortIcon('amount')}</th>
-                <th>Acciones</th>
+                <th style="width: 125px;">Acciones</th>
             </tr>
         `;
 
@@ -518,7 +518,7 @@ function renderTable() {
                 <td>${item.product}</td>
                 <td>${item.category}</td>
                 <td style="text-align: right; font-weight: bold;">${amount.toFixed(2)} €</td>
-                <td style="text-align: center;">
+                <td style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
                     <button class="action-btn btn-edit" data-id="${item.id}" title="Editar">✏️</button>
                     <button class="action-btn btn-delete" data-id="${item.id}" title="Borrar">🗑️</button>
@@ -532,14 +532,14 @@ function renderTable() {
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="date" style="cursor: pointer;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="date" style="cursor: pointer; width: 110px;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
                 <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
-                <th>Concepto</th>
+                <th style="width: 20%;">Concepto</th>
                 <th>Categoría</th>
                 <th data-sort="amount" style="cursor: pointer;">Importe Total${getSortIcon('amount')}</th>
-                <th>Acciones</th>
+                <th style="width: 125px;">Acciones</th>
             </tr>
         `;
 
@@ -614,7 +614,7 @@ function renderTable() {
                 <td style="font-size: 0.9rem; color: #555;">${concepts}</td>
                 <td style="font-size: 0.9rem; color: #555;">${categories}</td>
                 <td style="text-align: right; font-weight: bold;">${group.amount.toFixed(2)} €</td>
-                <td style="text-align: center;">
+                <td style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-view-group" style="background-color: #17a2b8; margin-right: 5px;" title="Ver Detalle">👁️</button>
                     <button class="action-btn btn-delete-group" data-ids='${idsString}' title="Borrar Ticket Completo">🗑️</button>
                 </td>
