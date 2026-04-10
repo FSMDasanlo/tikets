@@ -62,6 +62,32 @@ h1 {
     stroke: #007bff;
 }
 
+/* --- TOOLTIP PERSONALIZADO PARA BOTÓN LOGOUT --- */
+.tooltip-text {
+    visibility: hidden;
+    width: 100px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 100;
+    top: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.75rem;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+#btnLogout:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
 /* Estilos para la funcionalidad de Tickets */
 .input-group {
     display: flex;

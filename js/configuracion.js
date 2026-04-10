@@ -1,36 +1,51 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
+  query,
+  where,
+  writeBatch,
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- FUNCIÓN DE ALERTA PERSONALIZADA ---
-function showCustomAlert(message, type = 'neutral') {
-    let alertBox = document.getElementById('customAlert');
-    if (!alertBox) {
-        alertBox = document.createElement('div');
-        alertBox.id = 'customAlert';
-        alertBox.className = 'custom-alert';
-        document.body.appendChild(alertBox);
-    }
-    alertBox.textContent = message;
-    alertBox.className = 'custom-alert'; // Reset clases
-    if (type === 'success') alertBox.classList.add('success');
-    if (type === 'error') alertBox.classList.add('error');
-    
-    void alertBox.offsetWidth; // Forzar reflow
-    alertBox.classList.add('show');
-    setTimeout(() => alertBox.classList.remove('show'), 2000);
+function showCustomAlert(message, type = "neutral") {
+  let alertBox = document.getElementById("customAlert");
+  if (!alertBox) {
+    alertBox = document.createElement("div");
+    alertBox.id = "customAlert";
+    alertBox.className = "custom-alert";
+    document.body.appendChild(alertBox);
+  }
+  alertBox.textContent = message;
+  alertBox.className = "custom-alert"; // Reset clases
+  if (type === "success") alertBox.classList.add("success");
+  if (type === "error") alertBox.classList.add("error");
+
+  void alertBox.offsetWidth; // Forzar reflow
+  alertBox.classList.add("show");
+  setTimeout(() => alertBox.classList.remove("show"), 2000);
 }
 
 // --- FUNCIÓN DE CONFIRMACIÓN PERSONALIZADA ---
 function showCustomConfirm(message) {
-    return new Promise((resolve) => {
-        let modal = document.getElementById('customConfirmModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'customConfirmModal';
-            modal.className = 'modal-overlay';
-            modal.style.zIndex = '9998'; // Justo debajo del alert (9999)
-            modal.innerHTML = `
+  return new Promise((resolve) => {
+    let modal = document.getElementById("customConfirmModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "customConfirmModal";
+      modal.className = "modal-overlay";
+      modal.style.zIndex = "9998"; // Justo debajo del alert (9999)
+      modal.innerHTML = `
                 <div class="modal-content" style="max-width: 400px; text-align: center;">
                     <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmación</h3>
                     <p id="confirmMessage" style="color: #666; margin-bottom: 25px; font-size: 1.1rem;"></p>
@@ -40,41 +55,44 @@ function showCustomConfirm(message) {
                     </div>
                 </div>
             `;
-            document.body.appendChild(modal);
-        }
+      document.body.appendChild(modal);
+    }
 
-        const msgElement = document.getElementById('confirmMessage');
-        const btnYes = document.getElementById('confirmBtnYes');
-        const btnNo = document.getElementById('confirmBtnNo');
+    const msgElement = document.getElementById("confirmMessage");
+    const btnYes = document.getElementById("confirmBtnYes");
+    const btnNo = document.getElementById("confirmBtnNo");
 
-        msgElement.innerHTML = message.replace(/\n/g, '<br>'); // Permitir saltos de línea
-        
-        // 1. Mostrar modal
-        modal.style.display = 'flex';
-        
-        // 2. Forzar reflow
-        void modal.offsetWidth;
-        
-        // 3. Animar entrada
-        modal.classList.add('show');
+    msgElement.innerHTML = message.replace(/\n/g, "<br>"); // Permitir saltos de línea
 
-        // Clonar botones para eliminar eventos anteriores
-        const newBtnYes = btnYes.cloneNode(true);
-        const newBtnNo = btnNo.cloneNode(true);
-        btnYes.parentNode.replaceChild(newBtnYes, btnYes);
-        btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+    // 1. Mostrar modal
+    modal.style.display = "flex";
 
-        // 4. Enfocar botón Sí
-        newBtnYes.focus();
+    // 2. Forzar reflow
+    void modal.offsetWidth;
 
-        const closeModal = (result) => {
-            modal.classList.remove('show');
-            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
-        };
+    // 3. Animar entrada
+    modal.classList.add("show");
 
-        newBtnYes.addEventListener('click', () => closeModal(true));
-        newBtnNo.addEventListener('click', () => closeModal(false));
-    });
+    // Clonar botones para eliminar eventos anteriores
+    const newBtnYes = btnYes.cloneNode(true);
+    const newBtnNo = btnNo.cloneNode(true);
+    btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+    btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+    // 4. Enfocar botón Sí
+    newBtnYes.focus();
+
+    const closeModal = (result) => {
+      modal.classList.remove("show");
+      setTimeout(() => {
+        modal.style.display = "none";
+        resolve(result);
+      }, 300);
+    };
+
+    newBtnYes.addEventListener("click", () => closeModal(true));
+    newBtnNo.addEventListener("click", () => closeModal(false));
+  });
 }
 
 // --- CONFIGURACIÓN DE FIREBASE ---
@@ -85,7 +103,7 @@ const firebaseConfig = {
   storageBucket: "tikets-e8747.firebasestorage.app",
   messagingSenderId: "1011614009578",
   appId: "1:1011614009578:web:b18505cbd4b98e7a6d2f93",
-  measurementId: "G-Z3HSTEH6JN"
+  measurementId: "G-Z3HSTEH6JN",
 };
 
 // Inicializar Firebase
@@ -95,322 +113,421 @@ const auth = getAuth(app);
 let currentUser = null;
 
 onAuthStateChanged(auth, (user) => {
-    if (user) {
-        currentUser = user;
-        const headerUserDisplay = document.getElementById('headerUserDisplay');
-        if(headerUserDisplay) headerUserDisplay.textContent = `Usuario: ${user.email}`;
-        loadCollection('levels', levelsList);
-        loadCollection('categories', categoriesList);
-        
-        // Mostrar panel de administración solo a Jesus
-        // Usamos toLowerCase() para asegurar que coincida aunque haya mayúsculas/minúsculas
-        if (user.email && user.email.toLowerCase() === 'jesus@gmail.com' && adminCard) {
-            adminCard.style.display = 'block';
-        }
-    } else {
-        window.location.href = 'login.html';
+  if (user) {
+    currentUser = user;
+    const headerUserDisplay = document.getElementById("headerUserDisplay");
+    if (headerUserDisplay)
+      headerUserDisplay.textContent = `Usuario: ${user.email}`;
+    loadCollection("levels", levelsList);
+    loadCollection("categories", categoriesList);
+
+    // Mostrar panel de administración solo a Jesus
+    // Usamos toLowerCase() para asegurar que coincida aunque haya mayúsculas/minúsculas
+    if (
+      user.email &&
+      user.email.toLowerCase() === "jesus@gmail.com" &&
+      adminCard
+    ) {
+      adminCard.style.display = "block";
     }
+
+    // Mostrar panel de mantenimiento solo para Teresa o Jesus
+    if (
+      user.email &&
+      (user.email.toLowerCase() === "teresa1803@gmail.com" ||
+        user.email.toLowerCase() === "jesus@gmail.com")
+    ) {
+      document.getElementById("maintenanceCard").style.display = "block";
+    }
+  } else {
+    window.location.href = "login.html";
+  }
 });
 
 console.log("✅ Script configuracion.js cargado.");
 
 // Elementos DOM
-const levelsList = document.getElementById('levelsList');
-const categoriesList = document.getElementById('categoriesList');
-const newLevelInput = document.getElementById('newLevelInput');
-const newCategoryInput = document.getElementById('newCategoryInput');
-const newCategoryColor = document.getElementById('newCategoryColor');
-const addLevelBtn = document.getElementById('addLevelBtn');
-const addCategoryBtn = document.getElementById('addCategoryBtn');
-const migrateBtn = document.getElementById('migrateBtn');
-const adminCard = document.getElementById('adminCard');
+const levelsList = document.getElementById("levelsList");
+const categoriesList = document.getElementById("categoriesList");
+const newLevelInput = document.getElementById("newLevelInput");
+const newCategoryInput = document.getElementById("newCategoryInput");
+const newCategoryColor = document.getElementById("newCategoryColor");
+const addLevelBtn = document.getElementById("addLevelBtn");
+const addCategoryBtn = document.getElementById("addCategoryBtn");
+const migrateBtn = document.getElementById("migrateBtn");
+const fixBankBtn = document.getElementById("fixBankBtn");
+const btnLogout = document.getElementById("btnLogout");
+const adminCard = document.getElementById("adminCard");
 
 // Modal
-const configEditModal = document.getElementById('configEditModal');
-const modalTitle = document.getElementById('modalTitle');
-const editItemId = document.getElementById('editItemId');
-const editItemType = document.getElementById('editItemType');
-const editItemName = document.getElementById('editItemName');
-const editItemColor = document.getElementById('editItemColor');
-const colorGroup = document.getElementById('colorGroup');
-const saveConfigEditBtn = document.getElementById('saveConfigEditBtn');
-const closeConfigEditBtn = document.getElementById('closeConfigEditBtn');
+const configEditModal = document.getElementById("configEditModal");
+const modalTitle = document.getElementById("modalTitle");
+const editItemId = document.getElementById("editItemId");
+const editItemType = document.getElementById("editItemType");
+const editItemName = document.getElementById("editItemName");
+const editItemColor = document.getElementById("editItemColor");
+const colorGroup = document.getElementById("colorGroup");
+const saveConfigEditBtn = document.getElementById("saveConfigEditBtn");
+const closeConfigEditBtn = document.getElementById("closeConfigEditBtn");
 
-let currentOriginalName = ''; // Para guardar el nombre original antes de editar
+let currentOriginalName = ""; // Para guardar el nombre original antes de editar
 
 // --- FUNCIONES GENÉRICAS ---
 
 async function loadCollection(collectionName, listElement) {
-    listElement.innerHTML = '<li style="text-align: center; color: #777;">Cargando...</li>';
-    try {
-        // Usamos consulta simple sin orderBy para evitar errores de índices en Firestore
-        // Filtramos por UID
-        const q = query(collection(db, collectionName), where("uid", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
-        
-        listElement.innerHTML = '';
-        
-        if (querySnapshot.empty) {
-            listElement.innerHTML = '<li style="text-align: center; color: #999;">Sin elementos (Lista vacía)</li>';
-            return;
-        }
+  listElement.innerHTML =
+    '<li style="text-align: center; color: #777;">Cargando...</li>';
+  try {
+    // Usamos consulta simple sin orderBy para evitar errores de índices en Firestore
+    // Filtramos por UID
+    const q = query(
+      collection(db, collectionName),
+      where("uid", "==", currentUser.uid),
+    );
+    const querySnapshot = await getDocs(q);
 
-        const template = document.getElementById('listItemTemplate');
-        
-        // Convertimos a array para ordenar en cliente (más seguro y rápido para listas pequeñas)
-        const docs = [];
-        querySnapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-        
-        // Ordenar alfabéticamente
-        docs.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    listElement.innerHTML = "";
 
-        docs.forEach((data) => {
-            const clone = template.content.cloneNode(true);
-            
-            const nameSpan = clone.querySelector('.item-name');
-            nameSpan.textContent = data.name;
-
-            // Si es categoría y tiene color, mostramos un punto
-            if (collectionName === 'categories' && data.color) {
-                const dot = document.createElement('span');
-                dot.style.display = 'inline-block';
-                dot.style.width = '12px';
-                dot.style.height = '12px';
-                dot.style.backgroundColor = data.color;
-                dot.style.borderRadius = '50%';
-                dot.style.marginRight = '8px';
-                nameSpan.prepend(dot);
-            }
-            
-            // Botón Editar
-            clone.querySelector('.btn-edit').addEventListener('click', () => {
-                openEditModal(data.id, data.name, collectionName, data.color);
-            });
-
-            // Botón Borrar
-            clone.querySelector('.btn-delete').addEventListener('click', () => {
-                // Pasamos también el nombre para comprobar uso
-                deleteItem(data.id, data.name, collectionName, listElement);
-            });
-
-            listElement.appendChild(clone);
-        });
-
-    } catch (error) {
-        console.error(`Error cargando ${collectionName}:`, error);
-        listElement.innerHTML = `<li style="color: red;">Error: ${error.message}</li>`;
+    if (querySnapshot.empty) {
+      listElement.innerHTML =
+        '<li style="text-align: center; color: #999;">Sin elementos (Lista vacía)</li>';
+      return;
     }
+
+    const template = document.getElementById("listItemTemplate");
+
+    // Convertimos a array para ordenar en cliente (más seguro y rápido para listas pequeñas)
+    const docs = [];
+    querySnapshot.forEach((doc) => docs.push({ id: doc.id, ...doc.data() }));
+
+    // Ordenar alfabéticamente
+    docs.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    docs.forEach((data) => {
+      const clone = template.content.cloneNode(true);
+
+      const nameSpan = clone.querySelector(".item-name");
+      nameSpan.textContent = data.name;
+
+      // Si es categoría y tiene color, mostramos un punto
+      if (collectionName === "categories" && data.color) {
+        const dot = document.createElement("span");
+        dot.style.display = "inline-block";
+        dot.style.width = "12px";
+        dot.style.height = "12px";
+        dot.style.backgroundColor = data.color;
+        dot.style.borderRadius = "50%";
+        dot.style.marginRight = "8px";
+        nameSpan.prepend(dot);
+      }
+
+      // Botón Editar
+      clone.querySelector(".btn-edit").addEventListener("click", () => {
+        openEditModal(data.id, data.name, collectionName, data.color);
+      });
+
+      // Botón Borrar
+      clone.querySelector(".btn-delete").addEventListener("click", () => {
+        // Pasamos también el nombre para comprobar uso
+        deleteItem(data.id, data.name, collectionName, listElement);
+      });
+
+      listElement.appendChild(clone);
+    });
+  } catch (error) {
+    console.error(`Error cargando ${collectionName}:`, error);
+    listElement.innerHTML = `<li style="color: red;">Error: ${error.message}</li>`;
+  }
 }
 
 async function addItem(inputElement, collectionName, listElement) {
-    const name = inputElement.value.trim();
-    if (!name) return;
+  const name = inputElement.value.trim();
+  if (!name) return;
 
-    // Convertir a mayúsculas si es Zona para mantener consistencia
-    const finalName = collectionName === 'levels' ? name.toUpperCase() : name;
+  // Convertir a mayúsculas si es Zona para mantener consistencia
+  const finalName = collectionName === "levels" ? name.toUpperCase() : name;
 
-    try {
-        // VALIDACIÓN DE DUPLICADOS
-        const q = query(
-            collection(db, collectionName), 
-            where("name", "==", finalName),
-            where("uid", "==", currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-            showCustomAlert(`El elemento "${finalName}" ya existe.`, "error");
-            return;
-        }
+  try {
+    // VALIDACIÓN DE DUPLICADOS
+    const q = query(
+      collection(db, collectionName),
+      where("name", "==", finalName),
+      where("uid", "==", currentUser.uid),
+    );
+    const querySnapshot = await getDocs(q);
 
-        const data = { name: finalName, uid: currentUser.uid };
-        
-        // Si es categoría, guardamos el color
-        if (collectionName === 'categories' && newCategoryColor) {
-            data.color = newCategoryColor.value;
-        }
-
-        await addDoc(collection(db, collectionName), data);
-        inputElement.value = '';
-        loadCollection(collectionName, listElement); // Recargar lista
-    } catch (error) {
-        console.error("Error añadiendo:", error);
-        showCustomAlert("Error al añadir: " + error.message, "error");
+    if (!querySnapshot.empty) {
+      showCustomAlert(`El elemento "${finalName}" ya existe.`, "error");
+      return;
     }
+
+    const data = { name: finalName, uid: currentUser.uid };
+
+    // Si es categoría, guardamos el color
+    if (collectionName === "categories" && newCategoryColor) {
+      data.color = newCategoryColor.value;
+    }
+
+    await addDoc(collection(db, collectionName), data);
+    inputElement.value = "";
+    loadCollection(collectionName, listElement); // Recargar lista
+  } catch (error) {
+    console.error("Error añadiendo:", error);
+    showCustomAlert("Error al añadir: " + error.message, "error");
+  }
 }
 
 async function deleteItem(id, name, collectionName, listElement) {
-    // COMPROBACIÓN DE USO (Solo para categorías)
-    if (collectionName === 'categories') {
-        try {
-            // Consultamos si hay gastos que usen esta categoría
-            const q = query(
-                collection(db, "expenses"), 
-                where("category", "==", name),
-                where("uid", "==", currentUser.uid)
-            );
-            const snapshot = await getDocs(q);
-            
-            if (!snapshot.empty) {
-                showCustomAlert(`⚠️ Categoría en uso (${snapshot.size} tickets). No se puede borrar.`, "error");
-                return; // Cancelamos el borrado
-            }
-        } catch (error) {
-            console.error("Error verificando uso de categoría:", error);
-            showCustomAlert("Error al verificar uso. Revisa consola.", "error");
-            return;
-        }
-    }
-
-    if (!(await showCustomConfirm(`¿Seguro que quieres eliminar "${name}"?`))) return;
-
+  // COMPROBACIÓN DE USO (Solo para categorías)
+  if (collectionName === "categories") {
     try {
-        await deleteDoc(doc(db, collectionName, id));
-        loadCollection(collectionName, listElement);
+      // Consultamos si hay gastos que usen esta categoría
+      const q = query(
+        collection(db, "expenses"),
+        where("category", "==", name),
+        where("uid", "==", currentUser.uid),
+      );
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        showCustomAlert(
+          `⚠️ Categoría en uso (${snapshot.size} tickets). No se puede borrar.`,
+          "error",
+        );
+        return; // Cancelamos el borrado
+      }
     } catch (error) {
-        console.error("Error borrando:", error);
-        showCustomAlert("Error al borrar: " + error.message, "error");
+      console.error("Error verificando uso de categoría:", error);
+      showCustomAlert("Error al verificar uso. Revisa consola.", "error");
+      return;
     }
+  }
+
+  if (!(await showCustomConfirm(`¿Seguro que quieres eliminar "${name}"?`)))
+    return;
+
+  try {
+    await deleteDoc(doc(db, collectionName, id));
+    loadCollection(collectionName, listElement);
+  } catch (error) {
+    console.error("Error borrando:", error);
+    showCustomAlert("Error al borrar: " + error.message, "error");
+  }
 }
 
 // --- MODAL DE EDICIÓN ---
 
 function openEditModal(id, currentName, type, currentColor) {
-    currentOriginalName = currentName;
-    editItemId.value = id;
-    editItemName.value = currentName;
-    editItemType.value = type; // 'levels' o 'categories'
-    
-    modalTitle.textContent = type === 'levels' ? 'Editar Zona' : 'Editar Categoría';
-    
-    // Mostrar/Ocultar campo de color
-    if (type === 'categories') {
-        colorGroup.style.display = 'block';
-        if(editItemColor) editItemColor.value = currentColor || '#007bff';
-    } else {
-        colorGroup.style.display = 'none';
-    }
+  currentOriginalName = currentName;
+  editItemId.value = id;
+  editItemName.value = currentName;
+  editItemType.value = type; // 'levels' o 'categories'
 
-    configEditModal.style.display = 'flex';
+  modalTitle.textContent =
+    type === "levels" ? "Editar Zona" : "Editar Categoría";
+
+  // Mostrar/Ocultar campo de color
+  if (type === "categories") {
+    colorGroup.style.display = "block";
+    if (editItemColor) editItemColor.value = currentColor || "#007bff";
+  } else {
+    colorGroup.style.display = "none";
+  }
+
+  configEditModal.style.display = "flex";
 }
 
-saveConfigEditBtn.addEventListener('click', async () => {
-    const id = editItemId.value;
-    const type = editItemType.value;
-    const newName = editItemName.value.trim();
+saveConfigEditBtn.addEventListener("click", async () => {
+  const id = editItemId.value;
+  const type = editItemType.value;
+  const newName = editItemName.value.trim();
 
-    if (!newName) return;
+  if (!newName) return;
 
-    const finalName = type === 'levels' ? newName.toUpperCase() : newName;
-    const updateData = { name: finalName };
+  const finalName = type === "levels" ? newName.toUpperCase() : newName;
+  const updateData = { name: finalName };
 
-    if (type === 'categories' && editItemColor) {
-        updateData.color = editItemColor.value;
+  if (type === "categories" && editItemColor) {
+    updateData.color = editItemColor.value;
+  }
+
+  try {
+    const docRef = doc(db, type, id);
+    await updateDoc(docRef, updateData);
+
+    // Si es una categoría y el nombre ha cambiado, actualizamos los tickets asociados
+    if (type === "categories" && finalName !== currentOriginalName) {
+      const q = query(
+        collection(db, "expenses"),
+        where("category", "==", currentOriginalName),
+        where("uid", "==", currentUser.uid),
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const batch = writeBatch(db);
+        querySnapshot.forEach((doc) => {
+          batch.update(doc.ref, { category: finalName });
+        });
+        await batch.commit();
+        showCustomAlert(
+          `✅ Categoría actualizada en ${querySnapshot.size} tickets.`,
+          "success",
+        );
+      }
     }
 
-    try {
-        const docRef = doc(db, type, id);
-        await updateDoc(docRef, updateData);
-
-        // Si es una categoría y el nombre ha cambiado, actualizamos los tickets asociados
-        if (type === 'categories' && finalName !== currentOriginalName) {
-            const q = query(
-                collection(db, "expenses"), 
-                where("category", "==", currentOriginalName),
-                where("uid", "==", currentUser.uid)
-            );
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const batch = writeBatch(db);
-                querySnapshot.forEach(doc => {
-                    batch.update(doc.ref, { category: finalName });
-                });
-                await batch.commit();
-                showCustomAlert(`✅ Categoría actualizada en ${querySnapshot.size} tickets.`, "success");
-            }
-        }
-        
-        configEditModal.style.display = 'none';
-        // Recargar la lista correspondiente
-        if (type === 'levels') loadCollection('levels', levelsList);
-        else loadCollection('categories', categoriesList);
-
-    } catch (error) {
-        console.error("Error actualizando:", error);
-        showCustomAlert("Error al actualizar: " + error.message, "error");
-    }
+    configEditModal.style.display = "none";
+    // Recargar la lista correspondiente
+    if (type === "levels") loadCollection("levels", levelsList);
+    else loadCollection("categories", categoriesList);
+  } catch (error) {
+    console.error("Error actualizando:", error);
+    showCustomAlert("Error al actualizar: " + error.message, "error");
+  }
 });
 
-closeConfigEditBtn.addEventListener('click', () => {
-    configEditModal.style.display = 'none';
+closeConfigEditBtn.addEventListener("click", () => {
+  configEditModal.style.display = "none";
 });
 
 // --- EVENT LISTENERS ---
 
 if (addLevelBtn) {
-    addLevelBtn.addEventListener('click', () => {
-        addItem(newLevelInput, 'levels', levelsList);
-    });
+  addLevelBtn.addEventListener("click", () => {
+    addItem(newLevelInput, "levels", levelsList);
+  });
 }
 
 if (addCategoryBtn) {
-    addCategoryBtn.addEventListener('click', () => {
-        addItem(newCategoryInput, 'categories', categoriesList);
-    });
+  addCategoryBtn.addEventListener("click", () => {
+    addItem(newCategoryInput, "categories", categoriesList);
+  });
 }
 
 // Permitir añadir con tecla Enter
 if (newLevelInput) {
-    newLevelInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addItem(newLevelInput, 'levels', levelsList);
-    });
+  newLevelInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") addItem(newLevelInput, "levels", levelsList);
+  });
 }
 
 if (newCategoryInput) {
-    newCategoryInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addItem(newCategoryInput, 'categories', categoriesList);
-    });
+  newCategoryInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter")
+      addItem(newCategoryInput, "categories", categoriesList);
+  });
 }
 
 // --- MIGRACIÓN DE DATOS ---
 if (migrateBtn) {
-    migrateBtn.addEventListener('click', async () => {
-        if (!(await showCustomConfirm("⚠️ ATENCIÓN ⚠️\n\nEsta acción buscará TODOS los gastos, categorías y zonas que NO tengan dueño y los asignará a TU usuario actual.\n\n¿Quieres continuar?"))) {
-            return;
+  migrateBtn.addEventListener("click", async () => {
+    if (
+      !(await showCustomConfirm(
+        "⚠️ ATENCIÓN ⚠️\n\nEsta acción buscará TODOS los gastos, categorías y zonas que NO tengan dueño y los asignará a TU usuario actual.\n\n¿Quieres continuar?",
+      ))
+    ) {
+      return;
+    }
+
+    migrateBtn.disabled = true;
+    migrateBtn.textContent = "Procesando...";
+
+    try {
+      const collections = ["expenses", "levels", "categories"];
+      let totalUpdated = 0;
+
+      for (const colName of collections) {
+        // Obtenemos TODOS los documentos de la colección
+        const snapshot = await getDocs(collection(db, colName));
+
+        for (const docSnap of snapshot.docs) {
+          // Si no tiene UID, es un dato antiguo -> Lo actualizamos
+          if (!docSnap.data().uid) {
+            await updateDoc(docSnap.ref, { uid: currentUser.uid });
+            totalUpdated++;
+          }
         }
+      }
 
-        migrateBtn.disabled = true;
-        migrateBtn.textContent = "Procesando...";
+      showCustomAlert(
+        `✅ Migración completada. ${totalUpdated} registros asignados.`,
+        "success",
+      );
+      // Recargar la página para ver los cambios
+      location.reload();
+    } catch (error) {
+      console.error("Error en migración:", error);
+      showCustomAlert("Error en migración: " + error.message, "error");
+      migrateBtn.disabled = false;
+      migrateBtn.textContent = "Importar Datos Antiguos";
+    }
+  });
+}
 
-        try {
-            const collections = ['expenses', 'levels', 'categories'];
-            let totalUpdated = 0;
+// --- REPARAR BANCOS VACÍOS (SCRIPT TEMPORAL) ---
+if (fixBankBtn) {
+  fixBankBtn.addEventListener("click", async () => {
+    if (
+      !(await showCustomConfirm(
+        "¿Quieres rellenar con 'CAIXA' todos tus gastos que no tengan banco asignado?",
+      ))
+    )
+      return;
 
-            for (const colName of collections) {
-                // Obtenemos TODOS los documentos de la colección
-                const snapshot = await getDocs(collection(db, colName));
-                
-                for (const docSnap of snapshot.docs) {
-                    // Si no tiene UID, es un dato antiguo -> Lo actualizamos
-                    if (!docSnap.data().uid) {
-                        await updateDoc(docSnap.ref, { uid: currentUser.uid });
-                        totalUpdated++;
-                    }
-                }
-            }
+    fixBankBtn.disabled = true;
+    fixBankBtn.textContent = "Procesando...";
 
-            showCustomAlert(`✅ Migración completada. ${totalUpdated} registros asignados.`, "success");
-            // Recargar la página para ver los cambios
-            location.reload();
+    try {
+      // Buscamos todos los gastos del usuario actual
+      const q = query(
+        collection(db, "expenses"),
+        where("uid", "==", currentUser.uid),
+      );
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      let count = 0;
 
-        } catch (error) {
-            console.error("Error en migración:", error);
-            showCustomAlert("Error en migración: " + error.message, "error");
-            migrateBtn.disabled = false;
-            migrateBtn.textContent = "Importar Datos Antiguos";
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        // Si el campo banco no existe, es null o está vacío, lo marcamos para actualizar
+        if (!data.bank || data.bank.trim() === "") {
+          batch.update(docSnap.ref, { bank: "CAIXA" });
+          count++;
         }
-    });
+      });
+
+      if (count > 0) {
+        await batch.commit();
+        showCustomAlert(
+          `✅ ¡Listo! Se han actualizado ${count} apuntes con el banco 'CAIXA'.`,
+          "success",
+        );
+      } else {
+        showCustomAlert(
+          "No se han encontrado apuntes con el banco vacío.",
+          "neutral",
+        );
+      }
+    } catch (error) {
+      console.error("Error al reparar bancos:", error);
+      showCustomAlert("Error: " + error.message, "error");
+    } finally {
+      fixBankBtn.disabled = false;
+      fixBankBtn.textContent = "Reparar Bancos Vacíos";
+    }
+  });
+}
+
+// --- CERRAR SESIÓN ---
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    if (await showCustomConfirm("¿Seguro que quieres cerrar sesión?")) {
+      signOut(auth).catch((err) =>
+        console.error("Error al cerrar sesión:", err),
+      );
+    }
+  });
 }
 
 // --- INICIALIZACIÓN ---
