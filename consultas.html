@@ -5,25 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consultas y Gestión</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>Consultas y Gestión</h1>
-    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
+    <div class="user-nav-bar">
+        <button onclick="location.href='index.html'" class="btn-home-nav" title="Volver al Menú">
+            <i class="fa-solid fa-house"></i>
+        </button>
+        <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; font-size: 0.9rem; margin: 0;"></p>
+    </div>
     
     <!-- Botón para volver -->
     <div class="header-actions">
-        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        </button>
-        <button id="btnViewTotal" class="btn-save" style="width: auto; background-color: #17a2b8; margin-left: 10px;">Solo Total</button>
-        <button id="btnViewDetail" class="btn-save" style="width: auto; background-color: #007bff; margin-left: 5px;">Detalle</button>
-        <button id="btnViewAccounts" class="btn-save" style="width: auto; background-color: #28a745; margin-left: 5px;">Cuentas</button>
+        <button id="btnViewTotal" class="btn-nav"><i class="fa-solid fa-calculator"></i>Solo Total</button>
+        <button id="btnViewDetail" class="btn-nav"><i class="fa-solid fa-list-ul"></i>Detalle</button>
+        <button id="btnViewAccounts" class="btn-nav"><i class="fa-solid fa-building-columns"></i>Cuentas</button>
+        <button id="btnViewEvolution" class="btn-nav"><i class="fa-solid fa-chart-line"></i>Evolución</button>
     </div>
 
     <div class="card-container" style="flex-direction: column; align-items: center;">
         <!-- Filtros -->
-        <div class="card" style="width: 100%; max-width: 1000px; cursor: default; transform: none; padding: 20px;">
+        <div class="card filter-card">
             <h2 style="margin-bottom: 20px;">Filtros de Búsqueda</h2>
             <div class="filters-container">
                 <div class="filter-group">
@@ -64,21 +68,23 @@
                     <label>Hasta</label>
                     <input type="date" id="filterDateEnd">
                 </div>
-                <div class="filter-group" style="flex-direction: row; gap: 5px; padding-top: 24px;">
-                    <button id="btnPrevMonth" class="action-btn" style="background-color: #6c757d; padding: 8px 12px; font-size: 0.9rem; height: 38px; width: auto;">Mes Ant.</button>
-                    <button id="btnCurrMonth" class="action-btn" style="background-color: #17a2b8; padding: 8px 12px; font-size: 0.9rem; height: 38px; width: auto;">Mes Act.</button>
-                    <button id="btnCurrYear" class="action-btn" style="background-color: #007bff; padding: 8px 12px; font-size: 0.9rem; height: 38px; width: auto;">Año Act.</button>
+                <div class="filter-actions" style="grid-column: span 2;">
+                    <button id="btnPrevMonth" class="btn-nav"><i class="fa-solid fa-angle-left"></i>Mes Ant.</button>
+                    <button id="btnCurrMonth" class="btn-nav"><i class="fa-solid fa-calendar-day"></i>Mes Act.</button>
+                    <button id="btnCurrYear" class="btn-nav"><i class="fa-solid fa-calendar-days"></i>Año Act.</button>
                 </div>
-                <div class="filter-group" style="flex-direction: row; align-items: center; padding-top: 28px;">
-                    <input type="checkbox" id="filterReturns" style="width: 20px; height: 20px; min-width: 20px; margin-right: 8px; cursor: pointer;">
+                <div class="filter-group" style="flex-direction: row; align-items: center; height: 38px;">
+                    <input type="checkbox" id="filterReturns" style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
                     <label for="filterReturns" style="margin: 0; cursor: pointer; font-weight: bold; color: #dc3545;">Ver Devoluciones</label>
                 </div>
-                <button id="searchBtn" class="camera-btn" style="border-radius: 5px; width: auto; padding: 0 20px; height: 38px; margin-top: 18px;">
-                    Buscar
-                </button>
-                <button id="clearFiltersBtn" class="btn-save" style="background-color: #6c757d; width: auto; margin-top: 18px; padding: 0 15px; margin-left: 10px;">
-                    Limpiar filtros
-                </button>
+                <div class="filter-actions">
+                    <button id="searchBtn" class="btn-nav" style="flex: 1;">
+                        <i class="fa-solid fa-magnifying-glass"></i>Buscar
+                    </button>
+                    <button id="clearFiltersBtn" class="btn-nav" style="flex: 1;">
+                        <i class="fa-solid fa-broom"></i>Limpiar
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -133,7 +139,7 @@
 
     <!-- Gráfico de Gastos -->
     <div class="card-container" style="margin-top: 20px; margin-bottom: 40px; justify-content: center;">
-        <div class="card" style="width: 100%; max-width: 500px; cursor: default; transform: none; padding: 20px; height: 400px;">
+        <div class="card" style="width: 100%; max-width: 1000px; cursor: default; transform: none; padding: 20px; height: 500px;">
             <canvas id="expenseChart"></canvas>
         </div>
     </div>

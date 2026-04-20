@@ -112,6 +112,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 let currentUser = null;
+
+// Función para formatear moneda
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt) + ' €';
 let currentIncomesData = []; // Almacenar datos cargados para edición
 
 // Elementos DOM - Añadir
@@ -144,7 +147,6 @@ const editIncomeConcept = document.getElementById("editIncomeConcept");
 const editIncomeAmount = document.getElementById("editIncomeAmount");
 const saveIncomeEditBtn = document.getElementById("saveIncomeEditBtn");
 const closeIncomeEditBtn = document.getElementById("closeIncomeEditBtn");
-const btnLogout = document.getElementById("btnLogout");
 
 // Autenticación
 onAuthStateChanged(auth, (user) => {
@@ -350,7 +352,7 @@ function renderTable(data) {
             <td>${displayDate}</td>
             <td>${item.bank}</td>
             <td>${item.concept}</td>
-            <td style="text-align: right; font-weight: bold; color: #28a745;">${amount.toFixed(2)} €</td>
+            <td style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
             <td style="text-align: center;">
                 <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;" title="Duplicar">📄</button>
                 <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" title="Editar">✏️</button>
@@ -360,7 +362,7 @@ function renderTable(data) {
     incomeTableBody.appendChild(row);
   });
 
-  totalIncomeSpan.textContent = `Total: ${total.toFixed(2)} €`;
+  totalIncomeSpan.textContent = `Total: ${formatCurrency(total)}`;
 
   // Eventos de botones
   document.querySelectorAll(".btn-delete").forEach((btn) => {
@@ -481,15 +483,6 @@ if (saveIncomeEditBtn) {
 if (closeIncomeEditBtn) {
   closeIncomeEditBtn.addEventListener("click", () => {
     editIncomeModal.style.display = "none";
-  });
-}
-
-// --- CERRAR SESIÓN ---
-if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    if (await showCustomConfirm("¿Seguro que quieres cerrar sesión?")) {
-      signOut(auth).catch((err) => console.error("Error al cerrar sesión:", err));
-    }
   });
 }
 

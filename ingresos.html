@@ -5,22 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Ingresos</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; border-bottom: 3px solid #007bff; margin-bottom: 40px; padding-bottom: 5px; width: fit-content; margin-left: auto; margin-right: auto;">
+    <div style="display: flex; align-items: center; justify-content: center; border-bottom: 3px solid #007bff; margin-bottom: 40px; padding-bottom: 5px; width: fit-content; margin-left: auto; margin-right: auto;">
         <h1 style="margin-bottom: 0; border-bottom: none; padding-bottom: 0;">Gestión de Ingresos</h1>
-        <button id="btnLogout" style="background: none; border: none; cursor: pointer; color: #dc3545; padding: 0; display: flex; align-items: center; margin-bottom: -5px; transition: transform 0.2s; position: relative;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-            <span class="tooltip-text">Cerrar Sesión</span>
-        </button>
     </div>
-    <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; margin-top: -35px; margin-bottom: 30px; font-size: 0.9rem;"></p>
-    
-    <!-- Botón para volver -->
-    <div class="header-actions">
-        <button onclick="location.href='index.html'" class="btn-save" style="width: auto; background-color: #6c757d; padding: 8px 12px;" title="Volver al Menú">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <div class="user-nav-bar">
+        <button onclick="location.href='index.html'" class="btn-home-nav" title="Volver al Menú">
+            <i class="fa-solid fa-house"></i>
         </button>
+        <p id="headerUserDisplay" style="text-align: center; color: #007bff; font-weight: bold; font-size: 0.9rem; margin: 0;"></p>
     </div>
 
     <div class="card-container" style="flex-direction: column; align-items: center;">

@@ -119,6 +119,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 let currentUser = null;
 
+// Función para formatear moneda
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt) + ' €';
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -570,7 +573,7 @@ function updateTableTotal() {
         total += val;
     });
 
-    tableTotalSpan.textContent = total.toFixed(2) + ' €';
+    tableTotalSpan.textContent = formatCurrency(total);
 }
 
 // Evento para recalcular total al editar la tabla

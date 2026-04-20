@@ -19,6 +19,10 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 let currentUser = null;
 
+// Función de utilidad para formatear moneda (miles con punto, decimales con coma)
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt) + ' €';
+const formatNumber = (num) => new Intl.NumberFormat('es-ES').format(num);
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -122,6 +126,7 @@ const resultsTableFoot = document.querySelector('#resultsTable tfoot');
 const btnViewTotal = document.getElementById('btnViewTotal');
 const btnViewDetail = document.getElementById('btnViewDetail');
 const btnViewAccounts = document.getElementById('btnViewAccounts');
+const btnViewEvolution = document.getElementById('btnViewEvolution');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
@@ -295,6 +300,10 @@ async function loadConfig() {
 
 // Función principal de búsqueda
 async function searchExpenses() {
+    if (currentViewMode === 'evolution') {
+        loadEvolutionData();
+        return;
+    }
     console.log("🔍 Iniciando búsqueda...");
     resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">⏳ Cargando datos de la nube...</td></tr>';
     
@@ -325,7 +334,7 @@ async function searchExpenses() {
             });
             currentTotalIncome = incomeTotal;
             currentFilteredIncomes = allIncomes;
-            totalIncomesSpan.textContent = `Ingresos: ${incomeTotal.toFixed(2)} €`;
+            totalIncomesSpan.textContent = `Ingresos: ${formatCurrency(incomeTotal)}`;
         } catch (err) {
             console.error("Error calculando ingresos:", err);
             currentTotalIncome = 0;
@@ -418,10 +427,10 @@ function clearFilters() {
     // Limpiar la tabla, gráfico y estadísticas
     resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #666;">Pulsa "Buscar" para mostrar los datos.</td></tr>';
     if (resultsTableFoot) resultsTableFoot.innerHTML = '';
-    totalResultsSpan.textContent = 'Gastos: 0.00 €';
+    totalResultsSpan.textContent = 'Gastos: ' + formatCurrency(0);
     if(totalIncomesSpan) totalIncomesSpan.textContent = 'Ingresos: 0.00 €';
     if(totalBalanceSpan) {
-        totalBalanceSpan.textContent = 'Balance: 0.00 €';
+        totalBalanceSpan.textContent = 'Balance: ' + formatCurrency(0);
         totalBalanceSpan.style.color = '#333';
     }
     currentTotalIncome = 0;
@@ -517,7 +526,7 @@ function renderTable() {
                 <td>${item.merchant}</td>
                 <td>${item.product}</td>
                 <td>${item.category}</td>
-                <td style="text-align: right; font-weight: bold;">${amount.toFixed(2)} €</td>
+                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
                 <td style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
                     <button class="action-btn btn-edit" data-id="${item.id}" title="Editar">✏️</button>
@@ -613,7 +622,7 @@ function renderTable() {
                 <td>${group.merchant}</td>
                 <td style="font-size: 0.9rem; color: #555;">${concepts}</td>
                 <td style="font-size: 0.9rem; color: #555;">${categories}</td>
-                <td style="text-align: right; font-weight: bold;">${group.amount.toFixed(2)} €</td>
+                <td style="text-align: right; font-weight: bold;">${formatCurrency(group.amount)}</td>
                 <td style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-view-group" style="background-color: #17a2b8; margin-right: 5px;" title="Ver Detalle">👁️</button>
                     <button class="action-btn btn-delete-group" data-ids='${idsString}' title="Borrar Ticket Completo">🗑️</button>
@@ -646,7 +655,7 @@ function renderTable() {
                     <tr style="${itemStyle}">
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.product}</td>
                         <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.category}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${itemAmount.toFixed(2)} €</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(itemAmount)}</td>
                     </tr>
                 `;
             });
@@ -679,18 +688,18 @@ function renderTable() {
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
-                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: #007bff;">${totalAmount.toFixed(2)} €</td>
+                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: #007bff;">${formatCurrency(totalAmount)}</td>
                 <td></td>
             </tr>
         `;
     }
 
-        totalResultsSpan.textContent = `Gastos: ${totalAmount.toFixed(2)} €`;
+        totalResultsSpan.textContent = `Gastos: ${formatCurrency(totalAmount)}`;
 
         // Actualizar Balance
         if (totalBalanceSpan) {
             const balance = currentTotalIncome - totalAmount;
-            totalBalanceSpan.textContent = `Balance: ${balance.toFixed(2)} €`;
+            totalBalanceSpan.textContent = `Balance: ${formatCurrency(balance)}`;
             totalBalanceSpan.style.color = balance >= 0 ? '#28a745' : '#dc3545';
         }
 
@@ -715,6 +724,9 @@ function renderChart() {
     const ctx = document.getElementById('expenseChart');
     if (!ctx) return;
 
+    // Si estamos en modo evolución o cuentas, no ejecutar la lógica de tarta de gastos
+    if (currentViewMode === 'evolution' || currentViewMode === 'accounts') return;
+
     // Comprobar si hay una categoría seleccionada en el filtro
     const selectedCategoryFilter = document.getElementById('filterCategory').value;
     const isCategorySelected = selectedCategoryFilter !== "";
@@ -729,7 +741,7 @@ function renderChart() {
 
     // Crear etiquetas con el importe incluido
     const labels = Object.keys(dataTotals).map(key => {
-        return `${key}: ${dataTotals[key].toFixed(2)} €`;
+        return `${key}: ${formatCurrency(dataTotals[key])}`;
     });
     const data = Object.values(dataTotals);
     
@@ -828,9 +840,9 @@ function updateStats() {
     const maxExpense = numTickets > 0 ? Math.max(...ticketValues) : 0;
     const avgExpense = numTickets > 0 ? totalAmount / numTickets : 0;
 
-    document.getElementById('statMax').textContent = maxExpense.toFixed(2) + ' €';
-    document.getElementById('statAvg').textContent = avgExpense.toFixed(2) + ' €';
-    document.getElementById('statCount').textContent = numTickets;
+    document.getElementById('statMax').textContent = formatCurrency(maxExpense);
+    document.getElementById('statAvg').textContent = formatCurrency(avgExpense);
+    document.getElementById('statCount').textContent = formatNumber(numTickets);
 }
 
 // Función para borrar
@@ -1018,19 +1030,30 @@ if(searchBtn) {
     // loadFilterOptions(); // Se llama en onAuthStateChanged
     // loadConfig();
 
+    // Función para gestionar visualmente el botón de vista activo
+    function updateActiveViewButton(activeId) {
+        const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution'];
+        viewButtons.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                if (id === activeId) btn.classList.add('active');
+                else btn.classList.remove('active');
+            }
+        });
+    }
+
+    // Inicializar estado visual
+    updateActiveViewButton('btnViewDetail');
+
     // Eventos botones de vista
     btnViewTotal.addEventListener('click', () => {
         currentViewMode = 'total';
-        btnViewTotal.style.backgroundColor = '#138496'; // Oscurecer activo
-        btnViewDetail.style.backgroundColor = '#007bff'; // Reset otro
-        if (btnViewAccounts) btnViewAccounts.style.backgroundColor = '#28a745';
+        updateActiveViewButton('btnViewTotal');
         renderTable();
     });
     btnViewDetail.addEventListener('click', () => {
         currentViewMode = 'detail';
-        btnViewDetail.style.backgroundColor = '#0056b3'; // Oscurecer activo
-        btnViewTotal.style.backgroundColor = '#17a2b8'; // Reset otro
-        if (btnViewAccounts) btnViewAccounts.style.backgroundColor = '#28a745';
+        updateActiveViewButton('btnViewDetail');
         renderTable();
     });
 
@@ -1038,9 +1061,7 @@ if(searchBtn) {
         btnViewAccounts.addEventListener('click', async () => {
             // 1. Cambiar estado visual y modo
             currentViewMode = 'accounts';
-            btnViewAccounts.style.backgroundColor = '#218838'; // Oscurecer activo
-            btnViewDetail.style.backgroundColor = '#007bff';
-            btnViewTotal.style.backgroundColor = '#17a2b8';
+            updateActiveViewButton('btnViewAccounts');
 
             // 2. Mostrar totales globales y estado de carga
             totalResultsSpan.style.display = 'inline';
@@ -1124,9 +1145,9 @@ if(searchBtn) {
 
                     row.innerHTML = `
                         <td style="font-weight: bold;">${bankName}</td>
-                        <td style="text-align: right; color: #28a745;">${account.incomes.toFixed(2)} €</td>
-                        <td style="text-align: right; color: #dc3545;">${account.expenses.toFixed(2)} €</td>
-                        <td style="text-align: right; font-weight: bold; color: ${balance >= 0 ? '#28a745' : '#dc3545'};">${balance.toFixed(2)} €</td>
+                        <td style="text-align: right; color: #28a745;">${formatCurrency(account.incomes)}</td>
+                        <td style="text-align: right; color: #dc3545;">${formatCurrency(account.expenses)}</td>
+                        <td style="text-align: right; font-weight: bold; color: ${balance >= 0 ? '#28a745' : '#dc3545'};">${formatCurrency(balance)}</td>
                     `;
 
                     const detailRow = document.createElement('tr');
@@ -1144,7 +1165,7 @@ if(searchBtn) {
                             const [y, m, d] = displayDate.split('-');
                             displayDate = `${d}-${m}-${y}`;
                         }
-                        detailsHtml += `<tr><td style="padding: 8px;">${displayDate}</td><td style="padding: 8px;">${concept}</td><td style="padding: 8px; text-align: right; color: ${color};">${mov.type === 'expense' ? '-' : ''}${amount.toFixed(2)} €</td></tr>`;
+                        detailsHtml += `<tr><td style="padding: 8px;">${displayDate}</td><td style="padding: 8px;">${concept}</td><td style="padding: 8px; text-align: right; color: ${color};">${mov.type === 'expense' ? '-' : ''}${formatCurrency(amount)}</td></tr>`;
                     });
                     detailsHtml += '</tbody></table></td>';
                     detailRow.innerHTML = detailsHtml;
@@ -1159,10 +1180,10 @@ if(searchBtn) {
 
                 // 6. Renderizar los totales en los spans de la cabecera
                 const totalBalanceGlobal = totalIncomesGlobal - totalExpensesGlobal;
-                totalIncomesSpan.textContent = `Ingresos: ${totalIncomesGlobal.toFixed(2)} €`;
-                totalResultsSpan.textContent = `Gastos: ${totalExpensesGlobal.toFixed(2)} €`;
+                totalIncomesSpan.textContent = `Ingresos: ${formatCurrency(totalIncomesGlobal)}`;
+                totalResultsSpan.textContent = `Gastos: ${formatCurrency(totalExpensesGlobal)}`;
                 if (totalBalanceSpan) {
-                    totalBalanceSpan.textContent = `Balance: ${totalBalanceGlobal.toFixed(2)} €`;
+                    totalBalanceSpan.textContent = `Balance: ${formatCurrency(totalBalanceGlobal)}`;
                     totalBalanceSpan.style.color = totalBalanceGlobal >= 0 ? '#28a745' : '#dc3545';
                 }
 
@@ -1173,6 +1194,113 @@ if(searchBtn) {
                 resultsTableBody.innerHTML = `<tr><td colspan="4" style="color:red; text-align:center;">Error al cargar el balance: ${error.message}</td></tr>`;
             }
         });
+    }
+
+    if (btnViewEvolution) {
+        btnViewEvolution.addEventListener('click', () => {
+            currentViewMode = 'evolution';
+            updateActiveViewButton('btnViewEvolution');
+            loadEvolutionData();
+        });
+    }
+}
+
+// Función para calcular y renderizar la evolución mensual
+async function loadEvolutionData() {
+    resultsTableHead.innerHTML = '<tr><th>Mes</th><th style="text-align: right;">Ingresos</th><th style="text-align: right;">Gastos</th><th style="text-align: right;">Diferencia</th><th style="text-align: right;">Acumulado</th><th style="text-align: right;">Balance Final</th></tr>';
+    resultsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Calculando evolución...</td></tr>';
+    if (resultsTableFoot) resultsTableFoot.innerHTML = '';
+
+    try {
+        // Cargamos TODO el histórico del usuario para calcular el balance acumulado real
+        const [expSnap, incSnap] = await Promise.all([
+            getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid))),
+            getDocs(query(collection(db, "incomes"), where("uid", "==", currentUser.uid)))
+        ]);
+
+        const monthlyData = {};
+        const process = (date, amt, type) => {
+            if (!date) return;
+            let d = date;
+            if (d.includes('/')) { const [day, mon, yr] = d.split('/'); d = `${yr}-${mon.padStart(2,'0')}-${day.padStart(2,'0')}`; }
+            const month = d.substring(0, 7); // Formato YYYY-MM
+            if (!monthlyData[month]) monthlyData[month] = { inc: 0, exp: 0 };
+            monthlyData[month][type] += parseFloat(amt) || 0;
+        };
+
+        expSnap.forEach(doc => process(doc.data().date, doc.data().amount, 'exp'));
+        incSnap.forEach(doc => process(doc.data().date, doc.data().amount, 'inc'));
+
+        const sortedMonths = Object.keys(monthlyData).sort();
+        let balanceAcc = 0;
+        const history = sortedMonths.map(m => {
+            const { inc, exp } = monthlyData[m];
+            const res = inc - exp;
+            balanceAcc += res;
+            return { month: m, income: inc, expense: exp, result: res, balance: balanceAcc };
+        });
+
+        // Aplicar filtros de fecha de la UI
+        const start = document.getElementById('filterDateStart').value;
+        const end = document.getElementById('filterDateEnd').value;
+        const filtered = history.filter(h => {
+            if (start && h.month < start.substring(0, 7)) return false;
+            if (end && h.month > end.substring(0, 7)) return false;
+            return true;
+        });
+
+        // Calculamos el acumulado del periodo filtrado
+        // Se suma de forma progresiva la diferencia de cada mes, ignorando el primer mes del periodo seleccionado.
+        let runningSum = 0;
+        const historyWithAcc = filtered.map((h, index) => {
+            if (index > 0) runningSum += h.result;
+            return { ...h, periodAcc: runningSum };
+        });
+
+        resultsTableBody.innerHTML = '';
+        if (historyWithAcc.length === 0) {
+            resultsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">No hay datos en el periodo seleccionado.</td></tr>';
+            return;
+        }
+
+        // Renderizamos la tabla de más reciente a más antiguo
+        [...historyWithAcc].reverse().forEach(h => {
+            const row = document.createElement('tr');
+            const resultColor = h.result >= 0 ? '#28a745' : '#dc3545';
+            const accColor = h.periodAcc >= 0 ? '#28a745' : '#dc3545';
+            row.innerHTML = `
+                <td>${h.month}</td>
+                <td style="text-align: right; color: #28a745;">${formatCurrency(h.income)}</td>
+                <td style="text-align: right; color: #dc3545;">${formatCurrency(h.expense)}</td>
+                <td style="text-align: right; font-weight: bold; color: ${resultColor};">${formatCurrency(h.result)}</td>
+                <td style="text-align: right; font-weight: bold; color: ${accColor};">${formatCurrency(h.periodAcc)}</td>
+                <td style="text-align: right; font-weight: bold; background-color: #f8f9fa;">${formatCurrency(h.balance)}</td>
+            `;
+            resultsTableBody.appendChild(row);
+        });
+
+        // Renderizar Gráfica de Evolución
+        if (expenseChart) expenseChart.destroy();
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        expenseChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: filtered.map(h => h.month),
+                datasets: [
+                    { label: 'Balance Final (€)', data: filtered.map(h => h.balance), borderColor: '#6f42c1', backgroundColor: 'rgba(111, 66, 193, 0.1)', fill: true, tension: 0.3 },
+                    { label: 'Resultado Mes (Ahorro)', data: filtered.map(h => h.result), borderColor: '#17a2b8', borderDash: [5, 5], fill: false, tension: 0.3 }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { title: { display: true, text: 'Evolución del Patrimonio y Ahorro Mensual' } } 
+            }
+        });
+
+    } catch (e) {
+        console.error(e);
+        resultsTableBody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">Error al cargar evolución: ${e.message}</td></tr>`;
     }
 }
 

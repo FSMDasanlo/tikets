@@ -156,7 +156,6 @@ const addLevelBtn = document.getElementById("addLevelBtn");
 const addCategoryBtn = document.getElementById("addCategoryBtn");
 const migrateBtn = document.getElementById("migrateBtn");
 const fixBankBtn = document.getElementById("fixBankBtn");
-const btnLogout = document.getElementById("btnLogout");
 const adminCard = document.getElementById("adminCard");
 
 // Modal
@@ -515,17 +514,6 @@ if (fixBankBtn) {
     } finally {
       fixBankBtn.disabled = false;
       fixBankBtn.textContent = "Reparar Bancos Vacíos";
-    }
-  });
-}
-
-// --- CERRAR SESIÓN ---
-if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    if (await showCustomConfirm("¿Seguro que quieres cerrar sesión?")) {
-      signOut(auth).catch((err) =>
-        console.error("Error al cerrar sesión:", err),
-      );
     }
   });
 }
