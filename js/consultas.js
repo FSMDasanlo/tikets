@@ -20,8 +20,14 @@ const auth = getAuth(app);
 let currentUser = null;
 
 // Función de utilidad para formatear moneda (miles con punto, decimales con coma)
-const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt) + ' €';
-const formatNumber = (num) => new Intl.NumberFormat('es-ES').format(num);
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2,
+    useGrouping: 'always' 
+}).format(amt) + ' €';
+const formatNumber = (num) => new Intl.NumberFormat('es-ES', { 
+    useGrouping: 'always' 
+}).format(num);
 
 onAuthStateChanged(auth, (user) => {
     if (user) {

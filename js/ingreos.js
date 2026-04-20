@@ -21,6 +21,13 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 let currentUser = null;
 
+// Función para formatear moneda
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2,
+    useGrouping: 'always' 
+}).format(amt) + ' €';
+
 // Elementos DOM - Añadir
 const addDate = document.getElementById('addDate');
 const addBank = document.getElementById('addBank');
@@ -188,7 +195,7 @@ function renderTable(data) {
             <td>${displayDate}</td>
             <td>${item.bank}</td>
             <td>${item.concept}</td>
-            <td style="text-align: right; font-weight: bold; color: #28a745;">${amount.toFixed(2)} €</td>
+            <td style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
             <td style="text-align: center;">
                 <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">🗑️</button>
             </td>
@@ -196,7 +203,7 @@ function renderTable(data) {
         incomeTableBody.appendChild(row);
     });
 
-    totalIncomeSpan.textContent = `Total: ${total.toFixed(2)} €`;
+    totalIncomeSpan.textContent = `Total: ${formatCurrency(total)}`;
 
     // Eventos de borrado
     document.querySelectorAll('.btn-delete').forEach(btn => {

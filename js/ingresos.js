@@ -114,7 +114,11 @@ const auth = getAuth(app);
 let currentUser = null;
 
 // Función para formatear moneda
-const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amt) + ' €';
+const formatCurrency = (amt) => new Intl.NumberFormat('es-ES', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2,
+    useGrouping: 'always' 
+}).format(amt) + ' €';
 let currentIncomesData = []; // Almacenar datos cargados para edición
 
 // Elementos DOM - Añadir
