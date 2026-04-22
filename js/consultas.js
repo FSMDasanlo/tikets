@@ -142,9 +142,22 @@ let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqu
 let currentFilteredIncomes = []; // Almacena los ingresos filtrados actuales
 let currentTotalIncome = 0; // Variable global para almacenar el total de ingresos
 let currentViewMode = 'detail'; // 'detail' o 'total'
+let drillDownViewMode = 'category'; // Almacena el modo de origen para el botón "Ver todo"
 let expenseChart = null; // Variable para el gráfico
 let categoryColors = {}; // Mapa de colores por categoría
 let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
+
+// Función para gestionar visualmente el botón de vista activo
+function updateActiveViewButton(activeId) {
+    const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution', 'btnViewByCategory', 'btnViewByConcept'];
+    viewButtons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            if (id === activeId) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+    });
+}
 
 // Elementos del Modal de Edición
 const editModalOverlay = document.getElementById('editModalOverlay');
@@ -464,6 +477,26 @@ function renderTable() {
     if (resultsTableFoot) resultsTableFoot.innerHTML = ''; // Limpiar pie anterior
     let totalAmount = 0;
 
+    // --- GESTIÓN DE BOTÓN PARA QUITAR FILTRO DE DRILL-DOWN ---
+    let resetBtn = document.getElementById('btnResetDrilldown');
+    // Si la cantidad de documentos mostrados es distinta a la original de la búsqueda, hay un filtro activo
+    if (currentFilteredDocs.length !== originalFilteredDocs.length) {
+        if (!resetBtn) {
+            resetBtn = document.createElement('button');
+            resetBtn.id = 'btnResetDrilldown';
+            resetBtn.innerHTML = '✕ Ver todo';
+            resetBtn.title = "Quitar filtro y volver a la vista agrupada";
+            resetBtn.style.cssText = 'margin-left: 10px; padding: 3px 10px; font-size: 0.8rem; vertical-align: middle; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: #fff; color: #333; font-weight: bold;';
+            resetBtn.onclick = () => { 
+                currentFilteredDocs = [...originalFilteredDocs]; 
+                currentViewMode = drillDownViewMode; // Volvemos a la vista agrupada original
+                updateActiveViewButton(currentViewMode === 'category' ? 'btnViewByCategory' : 'btnViewByConcept');
+                renderTable(); 
+            };
+            totalResultsSpan.parentElement.appendChild(resetBtn);
+        }
+    } else if (resetBtn) { resetBtn.remove(); }
+
     if (currentFilteredDocs.length === 0) {
         resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #666;">⚠️ No se encontraron resultados con estos filtros.</td></tr>';
         totalResultsSpan.textContent = 'Gastos: 0.00 €';
@@ -723,6 +756,8 @@ function renderTable() {
 
         sortedGroups.forEach(([cat, amount]) => {
             const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.title = "Haz clic para ver todos los tickets de esta categoría";
             totalAmount += amount;
 
             // Obtener color de la categoría si existe
@@ -736,6 +771,15 @@ function renderTable() {
                 <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
                 <td></td>
             `;
+
+            row.addEventListener('click', () => {
+                currentViewMode = 'detail';
+                updateActiveViewButton('btnViewDetail');
+                // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === cat);
+                renderTable();
+            });
+
             resultsTableBody.appendChild(row);
         });
     }
@@ -772,6 +816,8 @@ function renderTable() {
 
         sortedGroups.forEach(([prod, amount]) => {
             const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.title = "Haz clic para ver todos los tickets con este concepto";
             totalAmount += amount;
 
             row.innerHTML = `
@@ -781,6 +827,16 @@ function renderTable() {
                 <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
                 <td></td>
             `;
+
+            row.addEventListener('click', () => {
+                drillDownViewMode = 'category';
+                currentViewMode = 'detail';
+                updateActiveViewButton('btnViewDetail');
+                // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === cat);
+                renderTable();
+            });
+
             resultsTableBody.appendChild(row);
         });
     }
@@ -1153,23 +1209,27 @@ if(searchBtn) {
     btnViewTotal.addEventListener('click', () => {
         currentViewMode = 'total';
         updateActiveViewButton('btnViewTotal');
+        currentFilteredDocs = [...originalFilteredDocs];
         renderTable();
     });
     btnViewDetail.addEventListener('click', () => {
         currentViewMode = 'detail';
         updateActiveViewButton('btnViewDetail');
+        currentFilteredDocs = [...originalFilteredDocs];
         renderTable();
     });
     
     btnViewByCategory.addEventListener('click', () => {
         currentViewMode = 'category';
         updateActiveViewButton('btnViewByCategory');
+        currentFilteredDocs = [...originalFilteredDocs];
         renderTable();
     });
 
     btnViewByConcept.addEventListener('click', () => {
         currentViewMode = 'concept';
         updateActiveViewButton('btnViewByConcept');
+        currentFilteredDocs = [...originalFilteredDocs];
         renderTable();
     });
 
