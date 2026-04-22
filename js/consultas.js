@@ -133,6 +133,9 @@ const btnViewTotal = document.getElementById('btnViewTotal');
 const btnViewDetail = document.getElementById('btnViewDetail');
 const btnViewAccounts = document.getElementById('btnViewAccounts');
 const btnViewEvolution = document.getElementById('btnViewEvolution');
+const btnViewByCategory = document.getElementById('btnViewByCategory');
+const btnViewByConcept = document.getElementById('btnViewByConcept');
+const btnExportPDF = document.getElementById('btnExportPDF');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
@@ -687,6 +690,100 @@ function renderTable() {
             resultsTableBody.appendChild(detailRow);
         });
     }
+    // --- MODO AGRUPADO POR CATEGORÍA ---
+    else if (currentViewMode === 'category') {
+        resultsTableHead.innerHTML = `
+            <tr>
+                <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
+                <th data-sort="amount" style="cursor: pointer; text-align: right;">Importe Total${getSortIcon('amount')}</th>
+                <th style="width: 50px;"></th>
+            </tr>
+        `;
+
+        const groups = {};
+        currentFilteredDocs.forEach(item => {
+            const cat = item.category || 'Sin Categoría';
+            if (!groups[cat]) groups[cat] = 0;
+            groups[cat] += parseFloat(item.amount) || 0;
+        });
+
+        // Convertir a array para ordenar
+        const sortedGroups = Object.entries(groups).sort((a, b) => {
+            let valA, valB;
+            if (sortState.column === 'amount') {
+                valA = a[1];
+                valB = b[1];
+                return sortState.direction === 'asc' ? valA - valB : valB - valA;
+            } else {
+                valA = a[0].toLowerCase();
+                valB = b[0].toLowerCase();
+                return sortState.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+        });
+
+        sortedGroups.forEach(([cat, amount]) => {
+            const row = document.createElement('tr');
+            totalAmount += amount;
+
+            // Obtener color de la categoría si existe
+            const dotColor = categoryColors[cat] || '#ccc';
+
+            row.innerHTML = `
+                <td style="font-weight: bold;">
+                    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${dotColor}; margin-right:8px;"></span>
+                    ${cat}
+                </td>
+                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td></td>
+            `;
+            resultsTableBody.appendChild(row);
+        });
+    }
+    // --- MODO AGRUPADO POR CONCEPTO ---
+    else if (currentViewMode === 'concept') {
+        resultsTableHead.innerHTML = `
+            <tr>
+                <th data-sort="product" style="cursor: pointer;">Concepto${getSortIcon('product')}</th>
+                <th data-sort="amount" style="cursor: pointer; text-align: right;">Importe Total${getSortIcon('amount')}</th>
+                <th style="width: 50px;"></th>
+            </tr>
+        `;
+
+        const groups = {};
+        currentFilteredDocs.forEach(item => {
+            const prod = item.product || 'Sin Concepto';
+            if (!groups[prod]) groups[prod] = 0;
+            groups[prod] += parseFloat(item.amount) || 0;
+        });
+
+        // Convertir a array para ordenar
+        const sortedGroups = Object.entries(groups).sort((a, b) => {
+            let valA, valB;
+            if (sortState.column === 'amount') {
+                valA = a[1];
+                valB = b[1];
+                return sortState.direction === 'asc' ? valA - valB : valB - valA;
+            } else {
+                valA = a[0].toLowerCase();
+                valB = b[0].toLowerCase();
+                return sortState.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+        });
+
+        sortedGroups.forEach(([prod, amount]) => {
+            const row = document.createElement('tr');
+            totalAmount += amount;
+
+            row.innerHTML = `
+                <td style="font-weight: bold;">
+                    ${prod}
+                </td>
+                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td></td>
+            `;
+            resultsTableBody.appendChild(row);
+        });
+    }
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot) {
@@ -745,14 +842,15 @@ function renderChart() {
         dataTotals[key] = (dataTotals[key] || 0) + amount;
     });
 
+    // Ordenar de mayor a menor
+    const sortedEntries = Object.entries(dataTotals).sort((a, b) => b[1] - a[1]);
+
     // Crear etiquetas con el importe incluido
-    const labels = Object.keys(dataTotals).map(key => {
-        return `${key}: ${formatCurrency(dataTotals[key])}`;
-    });
-    const data = Object.values(dataTotals);
+    const labels = sortedEntries.map(([key, value]) => `${key}: ${formatCurrency(value)}`);
+    const data = sortedEntries.map(entry => entry[1]);
     
     // Mapear colores
-    const backgroundColors = Object.keys(dataTotals).map(key => {
+    const backgroundColors = sortedEntries.map(([key, value]) => {
         if (isCategorySelected) {
             // Generar color basado en hash para comercios (para que sea consistente)
             let hash = 0;
@@ -1038,7 +1136,7 @@ if(searchBtn) {
 
     // Función para gestionar visualmente el botón de vista activo
     function updateActiveViewButton(activeId) {
-        const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution'];
+        const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution', 'btnViewByCategory', 'btnViewByConcept'];
         viewButtons.forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -1060,6 +1158,18 @@ if(searchBtn) {
     btnViewDetail.addEventListener('click', () => {
         currentViewMode = 'detail';
         updateActiveViewButton('btnViewDetail');
+        renderTable();
+    });
+    
+    btnViewByCategory.addEventListener('click', () => {
+        currentViewMode = 'category';
+        updateActiveViewButton('btnViewByCategory');
+        renderTable();
+    });
+
+    btnViewByConcept.addEventListener('click', () => {
+        currentViewMode = 'concept';
+        updateActiveViewButton('btnViewByConcept');
         renderTable();
     });
 
@@ -1209,6 +1319,10 @@ if(searchBtn) {
             loadEvolutionData();
         });
     }
+
+    if (btnExportPDF) {
+        btnExportPDF.addEventListener('click', exportToPDF);
+    }
 }
 
 // Función para calcular y renderizar la evolución mensual
@@ -1308,6 +1422,74 @@ async function loadEvolutionData() {
         console.error(e);
         resultsTableBody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center;">Error al cargar evolución: ${e.message}</td></tr>`;
     }
+}
+
+// Función para exportar la tabla actual a PDF
+async function exportToPDF() {
+    if (!window.jspdf) {
+        showCustomAlert("Error: No se encontró la librería jsPDF. Añádela al HTML.", "error");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4'); // Paisaje para que quepan más columnas
+
+    const start = document.getElementById('filterDateStart').value || 'Inicio';
+    const end = document.getElementById('filterDateEnd').value || 'Fin';
+
+    doc.setFontSize(18);
+    doc.text("Reporte de Gastos", 14, 15);
+    doc.setFontSize(11);
+    doc.text(`Periodo: ${start} a ${end}`, 14, 22);
+    doc.text(`Usuario: ${currentUser.email}`, 14, 28);
+
+    let head = [];
+    let body = [];
+
+    if (currentViewMode === 'detail') {
+        head = [['Fecha', 'Zona', 'Banco', 'Comercio', 'Concepto', 'Categoría', 'Importe']];
+        body = currentFilteredDocs.map(item => [
+            item.date,
+            item.level0 || '-',
+            item.bank || '-',
+            item.merchant,
+            item.product,
+            item.category,
+            formatCurrency(parseFloat(item.amount) || 0)
+        ]);
+    } else if (currentViewMode === 'total') {
+        const groups = {};
+        currentFilteredDocs.forEach(item => {
+            const key = `${item.date}|${item.merchant}|${item.level0}|${item.bank || 'N/A'}`;
+            if (!groups[key]) {
+                groups[key] = { date: item.date, merchant: item.merchant, level0: item.level0, bank: item.bank || 'N/A', amount: 0 };
+            }
+            groups[key].amount += parseFloat(item.amount) || 0;
+        });
+        head = [['Fecha', 'Zona', 'Banco', 'Comercio', 'Importe Total']];
+        body = Object.values(groups).map(g => [g.date, g.level0, g.bank, g.merchant, formatCurrency(g.amount)]);
+    } else if (currentViewMode === 'category' || currentViewMode === 'concept') {
+        const isCat = currentViewMode === 'category';
+        head = [[isCat ? 'Categoría' : 'Concepto', 'Importe Total']];
+        const groups = {};
+        currentFilteredDocs.forEach(item => {
+            const key = isCat ? (item.category || 'Sin Categoría') : (item.product || 'Sin Concepto');
+            groups[key] = (groups[key] || 0) + (parseFloat(item.amount) || 0);
+        });
+        body = Object.entries(groups)
+            .sort((a, b) => b[1] - a[1])
+            .map(([key, val]) => [key, formatCurrency(val)]);
+    }
+
+    doc.autoTable({
+        head: head,
+        body: body,
+        startY: 35,
+        theme: 'striped',
+        headStyles: { fillColor: [0, 123, 255] }
+    });
+
+    doc.save(`reporte_gastos_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // Evento clic en Ingresos para ir a la página de gestión con filtros
