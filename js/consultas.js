@@ -562,14 +562,14 @@ function renderTable() {
             }
 
             row.innerHTML = `
-                <td>${displayDate}</td>
-                <td>${item.level0 || '-'}</td>
-                <td>${item.bank || '-'}</td>
-                <td>${item.merchant}</td>
-                <td>${item.product}</td>
-                <td>${item.category}</td>
-                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
-                <td style="text-align: center; white-space: nowrap;">
+                <td data-label="Fecha">${displayDate}</td>
+                <td data-label="Zona">${item.level0 || '-'}</td>
+                <td data-label="Banco">${item.bank || '-'}</td>
+                <td data-label="Comercio">${item.merchant}</td>
+                <td data-label="Concepto">${item.product}</td>
+                <td data-label="Categoría">${item.category}</td>
+                <td data-label="Importe" style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td data-label="Acciones" style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
                     <button class="action-btn btn-edit" data-id="${item.id}" title="Editar">✏️</button>
                     <button class="action-btn btn-delete" data-id="${item.id}" title="Borrar">🗑️</button>
@@ -658,14 +658,14 @@ function renderTable() {
             const categories = [...new Set(group.items.map(i => i.category))].join(', ');
 
             row.innerHTML = `
-                <td>${displayDate}</td>
-                <td>${group.level0 || '-'}</td>
-                <td>${group.bank === 'N/A' ? '-' : group.bank}</td>
-                <td>${group.merchant}</td>
-                <td style="font-size: 0.9rem; color: #555;">${concepts}</td>
-                <td style="font-size: 0.9rem; color: #555;">${categories}</td>
-                <td style="text-align: right; font-weight: bold;">${formatCurrency(group.amount)}</td>
-                <td style="text-align: center; white-space: nowrap;">
+                <td data-label="Fecha">${displayDate}</td>
+                <td data-label="Zona">${group.level0 || '-'}</td>
+                <td data-label="Banco">${group.bank === 'N/A' ? '-' : group.bank}</td>
+                <td data-label="Comercio">${group.merchant}</td>
+                <td data-label="Conceptos" style="font-size: 0.9rem; color: #555;">${concepts}</td>
+                <td data-label="Categorías" style="font-size: 0.9rem; color: #555;">${categories}</td>
+                <td data-label="Total" style="text-align: right; font-weight: bold;">${formatCurrency(group.amount)}</td>
+                <td data-label="Acciones" style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-view-group" style="background-color: #17a2b8; margin-right: 5px;" title="Ver Detalle">👁️</button>
                     <button class="action-btn btn-delete-group" data-ids='${idsString}' title="Borrar Ticket Completo">🗑️</button>
                 </td>
@@ -764,11 +764,11 @@ function renderTable() {
             const dotColor = categoryColors[cat] || '#ccc';
 
             row.innerHTML = `
-                <td style="font-weight: bold;">
+                <td data-label="Categoría" style="font-weight: bold;">
                     <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${dotColor}; margin-right:8px;"></span>
                     ${cat}
                 </td>
-                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td data-label="Total" style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
                 <td></td>
             `;
 
@@ -821,10 +821,10 @@ function renderTable() {
             totalAmount += amount;
 
             row.innerHTML = `
-                <td style="font-weight: bold;">
+                <td data-label="Concepto" style="font-weight: bold;">
                     ${prod}
                 </td>
-                <td style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td data-label="Total" style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
                 <td></td>
             `;
 
@@ -1320,10 +1320,10 @@ if(searchBtn) {
                     totalExpensesGlobal += account.expenses;
 
                     row.innerHTML = `
-                        <td style="font-weight: bold;">${bankName}</td>
-                        <td style="text-align: right; color: #28a745;">${formatCurrency(account.incomes)}</td>
-                        <td style="text-align: right; color: #dc3545;">${formatCurrency(account.expenses)}</td>
-                        <td style="text-align: right; font-weight: bold; color: ${balance >= 0 ? '#28a745' : '#dc3545'};">${formatCurrency(balance)}</td>
+                        <td data-label="Banco" style="font-weight: bold;">${bankName}</td>
+                        <td data-label="Ingresos" style="text-align: right; color: #28a745;">${formatCurrency(account.incomes)}</td>
+                        <td data-label="Gastos" style="text-align: right; color: #dc3545;">${formatCurrency(account.expenses)}</td>
+                        <td data-label="Balance" style="text-align: right; font-weight: bold; color: ${balance >= 0 ? '#28a745' : '#dc3545'};">${formatCurrency(balance)}</td>
                     `;
 
                     const detailRow = document.createElement('tr');
@@ -1449,12 +1449,12 @@ async function loadEvolutionData() {
             const resultColor = h.result >= 0 ? '#28a745' : '#dc3545';
             const accColor = h.periodAcc >= 0 ? '#28a745' : '#dc3545';
             row.innerHTML = `
-                <td>${h.month}</td>
-                <td style="text-align: right; color: #28a745;">${formatCurrency(h.income)}</td>
-                <td style="text-align: right; color: #dc3545;">${formatCurrency(h.expense)}</td>
-                <td style="text-align: right; font-weight: bold; color: ${resultColor};">${formatCurrency(h.result)}</td>
-                <td style="text-align: right; font-weight: bold; color: ${accColor};">${formatCurrency(h.periodAcc)}</td>
-                <td style="text-align: right; font-weight: bold; background-color: #f8f9fa;">${formatCurrency(h.balance)}</td>
+                <td data-label="Mes">${h.month}</td>
+                <td data-label="Ingresos" style="text-align: right; color: #28a745;">${formatCurrency(h.income)}</td>
+                <td data-label="Gastos" style="text-align: right; color: #dc3545;">${formatCurrency(h.expense)}</td>
+                <td data-label="Diferencia" style="text-align: right; font-weight: bold; color: ${resultColor};">${formatCurrency(h.result)}</td>
+                <td data-label="Acumulado" style="text-align: right; font-weight: bold; color: ${accColor};">${formatCurrency(h.periodAcc)}</td>
+                <td data-label="Balance Final" style="text-align: right; font-weight: bold; background-color: #f8f9fa;">${formatCurrency(h.balance)}</td>
             `;
             resultsTableBody.appendChild(row);
         });

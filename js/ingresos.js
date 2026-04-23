@@ -353,11 +353,11 @@ function renderTable(data) {
 
     const row = document.createElement("tr");
     row.innerHTML = `
-            <td>${displayDate}</td>
-            <td>${item.bank}</td>
-            <td>${item.concept}</td>
-            <td style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
-            <td style="text-align: center;">
+            <td data-label="Fecha">${displayDate}</td>
+            <td data-label="Banco">${item.bank}</td>
+            <td data-label="Concepto">${item.concept}</td>
+            <td data-label="Importe" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
+            <td data-label="Acciones" style="text-align: center;">
                 <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;" title="Duplicar">📄</button>
                 <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" title="Editar">✏️</button>
                 <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Borrar">🗑️</button>

@@ -536,14 +536,14 @@ function addTableRow(product, price, category = null) {
 
     // Celdas editables
     row.innerHTML = `
-        <td contenteditable="true">${product}</td>
-        <td>
+        <td contenteditable="true" data-label="Concepto">${product}</td>
+        <td data-label="Categoría">
             <select class="category-select">
                 ${optionsHtml}
             </select>
         </td>
-        <td contenteditable="true" class="price-cell">${price}</td>
-        <td><button class="btn-close" style="padding: 5px 10px; font-size: 0.8rem;">X</button></td>
+        <td contenteditable="true" class="price-cell" data-label="Importe">${price}</td>
+        <td data-label="Acción"><button class="btn-close" style="padding: 5px 10px; font-size: 0.8rem;">X</button></td>
     `;
 
     // Añadir evento para borrar la fila y recalcular

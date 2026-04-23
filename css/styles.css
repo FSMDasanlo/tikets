@@ -514,14 +514,70 @@ tfoot td {
         min-width: 0;
     }
 
-    /* Tablas con scroll horizontal */
+    /* Transformación de tablas para móvil (Stacking) */
     .table-container {
         padding: 10px;
-        overflow-x: auto; /* Permite deslizar la tabla si no cabe */
+        overflow-x: visible;
     }
 
-    table {
-        min-width: 600px; /* Fuerza un ancho mínimo para que no se aplaste el contenido */
+    table, thead, tbody, th, td, tr, tfoot {
+        display: block;
+    }
+
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    tr {
+        border: 1px solid #ddd;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    td {
+        border: none;
+        border-bottom: 1px solid #eee;
+        position: relative;
+        padding-left: 45% !important;
+        text-align: right !important;
+        min-height: 35px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 40%;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: bold;
+        color: #666;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+    }
+
+    td:last-child {
+        border-bottom: none;
+        justify-content: center;
+        padding-left: 10px !important;
+    }
+
+    tfoot td {
+        padding-left: 10px !important;
+        justify-content: space-between;
+        background-color: #f8f9fa;
+    }
+
+    /* Ajuste de botones de acción en móvil */
+    .action-btn {
+        padding: 8px 15px;
+        margin: 2px;
     }
 
     /* Ajuste de modales */
