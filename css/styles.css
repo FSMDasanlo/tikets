@@ -502,6 +502,7 @@ tfoot td {
     /* Formularios en columna (Ticket Info y Filtros) */
     .ticket-info, 
     .filters-container {
+        display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 15px;
@@ -512,6 +513,21 @@ tfoot td {
     .filter-group select {
         width: 100%;
         min-width: 0;
+    }
+
+    /* Redistribución de botones de acción para que no desborden */
+    .filter-actions, .modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .filter-actions button, 
+    .btn-nav {
+        flex: 1 1 45%; /* Dos por fila si el espacio lo permite */
+        min-width: 120px;
+        margin: 0 !important;
     }
 
     /* Transformación de tablas para móvil (Stacking) */

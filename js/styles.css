@@ -478,6 +478,21 @@ tr.row-selected td {
         min-width: 0;
     }
 
+    /* Evitar que los botones de periodos y filtros se salgan */
+    .filter-actions, .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+    }
+
+    .header-actions button, 
+    .filter-actions button {
+        flex: 1 1 45%;
+        min-width: 130px;
+        margin: 2px 0 !important;
+    }
+
     /* Tablas con scroll horizontal */
     .table-container {
         padding: 10px;
