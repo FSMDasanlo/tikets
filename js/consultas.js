@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- CONFIGURACIÓN DE FIREBASE (Copiada de script.js) ---
@@ -117,6 +117,59 @@ function showCustomConfirm(message) {
     });
 }
 
+// --- FUNCIÓN DE PROMPT DE FECHA PERSONALIZADA ---
+function showDatePrompt(message) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('datePromptModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'datePromptModal';
+            modal.className = 'modal-overlay';
+            modal.style.zIndex = '9998';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px; text-align: center;">
+                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmar Pago Masivo</h3>
+                    <p id="datePromptMessage" style="color: #666; margin-bottom: 15px; font-size: 1.1rem;"></p>
+                    <div class="form-group" style="margin-bottom: 25px;">
+                        <input type="date" id="promptDateInput" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
+                    </div>
+                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
+                        <button id="datePromptBtnOk" class="btn-save" style="width: auto; margin: 0; min-width: 100px;">Aceptar</button>
+                        <button id="datePromptBtnCancel" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const msgElement = document.getElementById('datePromptMessage');
+        const dateInput = document.getElementById('promptDateInput');
+        const btnOk = document.getElementById('datePromptBtnOk');
+        const btnCancel = document.getElementById('datePromptBtnCancel');
+
+        msgElement.textContent = message;
+        dateInput.value = new Date().toISOString().split('T')[0]; // Hoy por defecto
+        
+        modal.style.display = 'flex';
+        void modal.offsetWidth;
+        modal.classList.add('show');
+        dateInput.focus();
+
+        const closePrompt = (result) => {
+            modal.classList.remove('show');
+            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
+        };
+
+        const newBtnOk = btnOk.cloneNode(true);
+        const newBtnCancel = btnCancel.cloneNode(true);
+        btnOk.parentNode.replaceChild(newBtnOk, btnOk);
+        btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+
+        newBtnOk.addEventListener('click', () => closePrompt(dateInput.value));
+        newBtnCancel.addEventListener('click', () => closePrompt(null));
+    });
+}
+
 // Elementos del DOM
 const searchBtn = document.getElementById('searchBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Botón para limpiar filtros
@@ -136,6 +189,7 @@ const btnViewEvolution = document.getElementById('btnViewEvolution');
 const btnViewByCategory = document.getElementById('btnViewByCategory');
 const btnViewByConcept = document.getElementById('btnViewByConcept');
 const btnExportPDF = document.getElementById('btnExportPDF');
+const btnPayAllToday = document.getElementById('btnPayAllToday');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
@@ -143,6 +197,7 @@ let currentFilteredIncomes = []; // Almacena los ingresos filtrados actuales
 let currentTotalIncome = 0; // Variable global para almacenar el total de ingresos
 let currentViewMode = 'detail'; // 'detail' o 'total'
 let drillDownViewMode = 'category'; // Almacena el modo de origen para el botón "Ver todo"
+let currentDateFilterType = 'incurredDate'; // 'incurredDate' o 'paymentDate'
 let expenseChart = null; // Variable para el gráfico
 let categoryColors = {}; // Mapa de colores por categoría
 let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
@@ -330,13 +385,16 @@ async function searchExpenses() {
     resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">⏳ Cargando datos de la nube...</td></tr>';
     
     const level0 = document.getElementById('filterLevel0').value;
-    const merchant = document.getElementById('filterMerchant').value;
+    const merchant = document.getElementById('filterMerchant').value; // Corregido: era 'filterMerchant'
     const product = document.getElementById('filterProduct').value;
     const category = document.getElementById('filterCategory').value;
     const bank = document.getElementById('filterBank').value;
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
     const showReturns = document.getElementById('filterReturns').checked;
+
+    const dateFilterInput = document.querySelector('input[name="dateFilterType"]:checked');
+    currentDateFilterType = dateFilterInput ? dateFilterInput.value : 'incurredDate';
 
     // --- CALCULAR INGRESOS (En base a fechas) ---
     if (totalIncomesSpan) {
@@ -401,9 +459,16 @@ async function searchExpenses() {
             // 5. Filtro Devoluciones (si está marcado)
             if (showReturns && (parseFloat(item.amount) || 0) >= 0) return false;
 
-            // 6. Filtro Fecha (Manual para soportar formatos mixtos YYYY-MM-DD y DD/MM/YYYY)
+            // 6. Filtro Fecha (aplicado a la fecha de gasto o fecha de pago según selección)
             if (dateStart || dateEnd) {
-                let itemDateStr = item.date;
+                const dateField = currentDateFilterType === 'incurredDate' ? 'date' : 'paymentDate';
+                let itemDateStr = item[dateField];
+
+                // Si se filtra por fecha de pago y el item no tiene fecha de pago, se excluye
+                if (currentDateFilterType === 'paymentDate' && !itemDateStr) {
+                    return false;
+                }
+
                 // Si la fecha guardada es antigua (DD/MM/YYYY), la convertimos para comparar
                 if (itemDateStr && itemDateStr.includes('/')) {
                     const [d, m, y] = itemDateStr.split('/');
@@ -535,6 +600,7 @@ function renderTable() {
             <tr>
                 <th data-sort="date" style="cursor: pointer; width: 110px;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
+                <th data-sort="paymentDate" style="cursor: pointer; width: 110px;">Fecha Pago${getSortIcon('paymentDate')}</th>
                 <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
                 <th data-sort="product" style="cursor: pointer; width: 20%;">Concepto${getSortIcon('product')}</th>
@@ -561,10 +627,18 @@ function renderTable() {
                 row.style.backgroundColor = '#d4edda';
             }
 
+            // Formatear fecha de pago si existe
+            let displayPaymentDate = item.paymentDate;
+            if (displayPaymentDate && displayPaymentDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, d] = displayPaymentDate.split('-');
+                displayPaymentDate = `${d}-${m}-${y}`;
+            }
+
             row.innerHTML = `
                 <td data-label="Fecha">${displayDate}</td>
                 <td data-label="Zona">${item.level0 || '-'}</td>
-                <td data-label="Banco">${item.bank || '-'}</td>
+                <td data-label="Fecha Pago">${displayPaymentDate || '-'}</td>
+                <td data-label="Banco">${item.bank || '-'}</td> 
                 <td data-label="Comercio">${item.merchant}</td>
                 <td data-label="Concepto">${item.product}</td>
                 <td data-label="Categoría">${item.category}</td>
@@ -603,6 +677,7 @@ function renderTable() {
                     date: item.date,
                     merchant: item.merchant,
                     level0: item.level0,
+                    paymentDate: item.paymentDate, // Incluir paymentDate en la agrupación
                     bank: item.bank || 'N/A',
                     amount: 0,
                     ids: [], // Guardamos todos los IDs de este grupo
@@ -842,8 +917,8 @@ function renderTable() {
     }
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
-    if (resultsTableFoot) {
-        const colspan = 6; // Ahora ambos modos tienen 6 columnas antes del importe
+    if (resultsTableFoot && currentViewMode !== 'evolution' && currentViewMode !== 'accounts') { // No mostrar en evolución o cuentas
+        const colspan = currentViewMode === 'detail' ? 7 : 6;
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
@@ -876,6 +951,43 @@ function renderTable() {
             btn.addEventListener('click', (e) => openDuplicateModal(e.target.dataset.id, currentFilteredDocs));
         });
     updateStats(); // Actualizar estadísticas con los datos visibles
+}
+
+// Función para pagar todos los gastos pendientes en la selección actual
+if (btnPayAllToday) {
+    btnPayAllToday.addEventListener('click', async () => {
+        // Solo tiene sentido si hay resultados y no estamos en vistas especiales como evolución
+        if (currentViewMode === 'evolution' || currentViewMode === 'accounts') {
+            showCustomAlert("Esta función no está disponible en la vista actual.", "neutral");
+            return;
+        }
+
+        const pending = currentFilteredDocs.filter(item => !item.paymentDate);
+        
+        if (pending.length === 0) {
+            showCustomAlert("No hay gastos pendientes de pago en los resultados actuales.", "neutral");
+            return;
+        }
+
+        const selectedDate = await showDatePrompt(`Se marcarán como pagados ${pending.length} gastos. Elige la fecha de cargo:`);
+        if (!selectedDate) return;
+        
+        try {
+            btnPayAllToday.disabled = true;
+            btnPayAllToday.textContent = "Procesando...";
+            const batch = writeBatch(db);
+            pending.forEach(item => batch.update(doc(db, "expenses", item.id), { paymentDate: selectedDate }));
+            await batch.commit();
+            showCustomAlert(`✅ Se han actualizado ${pending.length} gastos con fecha de pago ${selectedDate}.`, "success");
+            searchExpenses(); // Refrescar la tabla para ver los cambios
+        } catch (error) {
+            console.error("Error al pagar todo hoy:", error);
+            showCustomAlert("Error al actualizar: " + error.message, "error");
+        } finally {
+            btnPayAllToday.disabled = false;
+            btnPayAllToday.innerHTML = '<i class="fa-solid fa-check-double"></i>Pagar todo hoy';
+        }
+    });
 }
 
 // Función para renderizar el gráfico circular
@@ -1056,6 +1168,7 @@ function openEditModal(id, allDocs) {
         dateValue = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     document.getElementById('editDate').value = dateValue;
+    document.getElementById('editPaymentDate').value = item.paymentDate || dateValue; // Default a la fecha de compra
     
     document.getElementById('editProduct').value = item.product;
     document.getElementById('editCategory').value = item.category;
@@ -1083,6 +1196,7 @@ function openDuplicateModal(id, allDocs) {
         dateValue = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     document.getElementById('editDate').value = dateValue;
+    document.getElementById('editPaymentDate').value = item.paymentDate || dateValue; // Default a la fecha de compra
     
     document.getElementById('editProduct').value = item.product;
     document.getElementById('editCategory').value = item.category;
@@ -1101,7 +1215,8 @@ saveEditBtn.addEventListener('click', async () => {
         date: document.getElementById('editDate').value,
         product: document.getElementById('editProduct').value,
         category: document.getElementById('editCategory').value,
-        amount: parseFloat(document.getElementById('editAmount').value)
+        amount: parseFloat(document.getElementById('editAmount').value),
+        paymentDate: document.getElementById('editPaymentDate').value || null // Guardar la fecha de pago
     };
     
     // Asegurar que el UID se mantiene o se añade
@@ -1248,7 +1363,7 @@ if(searchBtn) {
             totalResultsSpan.textContent = 'Gastos: Calculando...';
             if (totalBalanceSpan) totalBalanceSpan.textContent = 'Balance: Calculando...';
 
-            resultsTableHead.innerHTML = `
+            resultsTableHead.innerHTML = ` 
                 <tr>
                     <th>Banco</th>
                     <th style="text-align: right;">Ingresos</th>
@@ -1507,7 +1622,7 @@ async function exportToPDF() {
     let body = [];
 
     if (currentViewMode === 'detail') {
-        head = [['Fecha', 'Zona', 'Banco', 'Comercio', 'Concepto', 'Categoría', 'Importe']];
+        head = [['Fecha', 'Zona', 'Fecha Pago', 'Banco', 'Comercio', 'Concepto', 'Categoría', 'Importe']];
         body = currentFilteredDocs.map(item => [
             item.date,
             item.level0 || '-',
@@ -1515,6 +1630,7 @@ async function exportToPDF() {
             item.merchant,
             item.product,
             item.category,
+            item.paymentDate || '-',
             formatCurrency(parseFloat(item.amount) || 0)
         ]);
     } else if (currentViewMode === 'total') {

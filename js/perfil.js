@@ -79,6 +79,7 @@ const confirmPasswordInput = document.getElementById('confirmPassword');
 const btnUpdatePassword = document.getElementById('btnUpdatePassword');
 const btnExportData = document.getElementById('btnExportData');
 const btnImportData = document.getElementById('btnImportData');
+const btnFixPaymentDates = document.getElementById('btnFixPaymentDates');
 const importFileInput = document.getElementById('importFileInput');
 const btnDeleteAccount = document.getElementById('btnDeleteAccount');
 const headerUserDisplay = document.getElementById('headerUserDisplay');
@@ -255,6 +256,54 @@ if (btnImportData && importFileInput) {
             }
         };
         reader.readAsText(file);
+    });
+}
+
+// --- REPARAR FECHAS DE PAGO (Iguala la fecha de pago a la de compra en todos los registros) ---
+if (btnFixPaymentDates) {
+    btnFixPaymentDates.addEventListener('click', async () => {
+        if (!(await showCustomConfirm("⚠️ ATENCIÓN: Esta acción revisará TODOS tus gastos y pondrá la 'Fecha de Pago' igual a la 'Fecha de Compra' donde falte.\n\n¿Quieres continuar?"))) return;
+
+        try {
+            btnFixPaymentDates.disabled = true;
+            btnFixPaymentDates.textContent = "Procesando...";
+
+            // Consultar todos los gastos del usuario
+            const q = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
+            const snapshot = await getDocs(q);
+            
+            const batchSize = 450; // Límite de seguridad para Firestore Batch
+            let batch = writeBatch(db);
+            let count = 0;
+            let totalUpdated = 0;
+
+            for (const docSnap of snapshot.docs) {
+                const data = docSnap.data();
+                // Solo actualizamos si la fecha de pago es nula, vacía o diferente a la de compra
+                if (!data.paymentDate || data.paymentDate !== data.date) {
+                    batch.update(docSnap.ref, { paymentDate: data.date });
+                    count++;
+                    totalUpdated++;
+
+                    // Si llegamos al límite del batch, lo ejecutamos y creamos uno nuevo
+                    if (count >= batchSize) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        count = 0;
+                    }
+                }
+            }
+
+            if (count > 0) await batch.commit();
+            alert(`✅ Proceso completado. Se han actualizado ${totalUpdated} registros con éxito.`);
+
+        } catch (error) {
+            console.error("Error al reparar fechas de pago:", error);
+            alert("Error al procesar: " + error.message);
+        } finally {
+            btnFixPaymentDates.disabled = false;
+            btnFixPaymentDates.textContent = "Reparar Fechas de Pago";
+        }
     });
 }
 

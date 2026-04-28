@@ -267,7 +267,9 @@ async function saveDataToDb() {
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const categorySelect = row.querySelector('.category-select');
-        const amountText = cells[2].innerText;
+        const paymentDateInput = row.querySelector('.row-payment-date');
+        
+        const amountText = cells[3].innerText;
         // Convertir a número para cálculos y almacenamiento consistente
         const amountVal = parseFloat(amountText.replace(',', '.').replace('€', '')) || 0;
         
@@ -281,7 +283,8 @@ async function saveDataToDb() {
             product: cells[0].innerText,
             category: categorySelect.value,
             amount: amountVal, // Guardamos como número
-            uid: currentUser.uid // IMPORTANTE: Asociar al usuario
+            uid: currentUser.uid, // IMPORTANTE: Asociar al usuario
+            paymentDate: paymentDateInput ? paymentDateInput.value : date // Usar la de la fila o la global
         });
     });
 
@@ -534,9 +537,13 @@ function addTableRow(product, price, category = null) {
         optionsHtml += `<option value="${cat}" ${selectedCategory === cat ? 'selected' : ''}>${cat}</option>`;
     });
 
+    // Obtener la fecha global actual para pre-rellenar la fecha de pago
+    const defaultPaymentDate = document.getElementById('globalDate').value || "";
+
     // Celdas editables
     row.innerHTML = `
         <td contenteditable="true" data-label="Concepto">${product}</td>
+        <td data-label="Fecha Pago"><input type="date" class="row-payment-date" value="${defaultPaymentDate}"></td>
         <td data-label="Categoría">
             <select class="category-select">
                 ${optionsHtml}
@@ -702,7 +709,8 @@ saveManualDirectBtn.addEventListener('click', async () => {
         product,
         category,
         amount,
-        uid: currentUser.uid // IMPORTANTE: Asociar al usuario
+        uid: currentUser.uid, // IMPORTANTE: Asociar al usuario
+        paymentDate: date // Por defecto, la misma fecha de la compra
     };
 
     try {

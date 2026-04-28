@@ -393,6 +393,7 @@ tfoot td {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 20px;
+    row-gap: 15px; /* Espacio extra entre filas de filtros */
     align-items: end;
 }
 
@@ -511,6 +512,7 @@ tfoot td {
     .filter-group, 
     .filter-group input, 
     .filter-group select {
+        margin-top: 5px; /* Espacio entre label y input en móvil */
         width: 100%;
         min-width: 0;
     }
