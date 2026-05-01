@@ -93,7 +93,7 @@ async function loadBankSuggestions() {
         expensesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
         incomesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
 
-        bankDatalist.innerHTML = '';
+        bankDatalist.innerHTML = '<option value=""></option>'; // Opción vacía para limpiar
         Array.from(banks).sort().forEach(bank => {
             bankDatalist.innerHTML += `<option value="${bank}"></option>`;
         });
@@ -167,6 +167,7 @@ const saveManualDirectBtn = document.getElementById('saveManualDirectBtn');
 // Inputs manuales
 const manualMerchant = document.getElementById('manualMerchant');
 const manualDate = document.getElementById('manualDate');
+const manualPaymentDate = document.getElementById('manualPaymentDate');
 const manualProduct = document.getElementById('manualProduct');
 const manualCategory = document.getElementById('manualCategory');
 const manualAmount = document.getElementById('manualAmount');
@@ -201,7 +202,7 @@ async function loadConfig() {
         
         if (!catsSnap.empty) {
             manualCatSelect.innerHTML = '';
-            globalCategories = [];
+            globalCategories = []; // Reiniciar globalCategories
             catsSnap.forEach(doc => {
                 const name = doc.data().name;
                 globalCategories.push(name);
@@ -267,8 +268,8 @@ async function saveDataToDb() {
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const categorySelect = row.querySelector('.category-select');
-        const paymentDateInput = row.querySelector('.row-payment-date');
-        
+        const paymentDateInput = row.querySelector('.row-payment-date'); // Input de fecha de pago de la fila
+
         const amountText = cells[3].innerText;
         // Convertir a número para cálculos y almacenamiento consistente
         const amountVal = parseFloat(amountText.replace(',', '.').replace('€', '')) || 0;
@@ -279,9 +280,9 @@ async function saveDataToDb() {
             level0: level0,
             merchant: merchant,
             date: date,
-            bank: bank,
-            product: cells[0].innerText,
-            category: categorySelect.value,
+            bank: bank.toLowerCase(), // Normalizar a minúsculas
+            product: cells[0].innerText.toLowerCase(), // Normalizar a minúsculas
+            category: categorySelect.value.toLowerCase(), // Normalizar a minúsculas
             amount: amountVal, // Guardamos como número
             uid: currentUser.uid, // IMPORTANTE: Asociar al usuario
             paymentDate: paymentDateInput ? paymentDateInput.value : date // Usar la de la fila o la global
@@ -293,7 +294,7 @@ async function saveDataToDb() {
         // Consultamos si ya existen gastos con ese comercio y fecha
         const q = query(
             collection(db, "expenses"), 
-            where("merchant", "==", merchant), 
+            where("merchant", "==", merchant.toLowerCase()), // Comparar en minúsculas
             where("date", "==", date),
             where("uid", "==", currentUser.uid) // Solo buscar duplicados propios
         );
@@ -426,7 +427,7 @@ async function processFile(file) {
         const merchantFound = lines[0] || "No detectado";
 
         // Rellenamos los campos globales (fuera de la tabla)
-        globalMerchantInput.value = merchantFound;
+        globalMerchantInput.value = merchantFound.toLowerCase(); // Normalizar a minúsculas
         globalDateInput.value = dateFound;
 
         let itemsFoundCount = 0;
@@ -436,7 +437,7 @@ async function processFile(file) {
                 const priceMatch = line.match(priceRegex);
                 // Limpiamos espacios dentro del precio para que sea un número válido (ej: "12, 50" -> "12,50")
                 const price = priceMatch[0].replace(/\s/g, '');
-                const desc = line.replace(priceMatch[0], '').replace('€', '').trim();
+                const desc = line.replace(priceMatch[0], '').replace('€', '').trim().toLowerCase(); // Normalizar a minúsculas
                 
                 // Añadimos directamente a la tabla
                 addTableRow(desc, price);
@@ -529,7 +530,7 @@ function guessCategory(productName) {
 function addTableRow(product, price, category = null) {
     const row = document.createElement('tr');
     
-    // Usamos la categoría pasada o intentamos adivinarla
+    // Usamos la categoría pasada o intentamos adivinarla (ya en minúsculas)
     const selectedCategory = category || guessCategory(product);
     
     let optionsHtml = '';
@@ -542,7 +543,7 @@ function addTableRow(product, price, category = null) {
 
     // Celdas editables
     row.innerHTML = `
-        <td contenteditable="true" data-label="Concepto">${product}</td>
+        <td contenteditable="true" data-label="Concepto">${product}</td> <!-- Se muestra como se extrajo, pero se guarda en minúsculas -->
         <td data-label="Fecha Pago"><input type="date" class="row-payment-date" value="${defaultPaymentDate}"></td>
         <td data-label="Categoría">
             <select class="category-select">
@@ -620,19 +621,19 @@ async function loadManualEntrySuggestions() {
             // Recopilar Comercios y contar frecuencias de categorías
             if (data.merchant) {
                 const m = data.merchant.trim();
-                merchants.add(m);
+                merchants.add(m.toLowerCase()); // Normalizar a minúsculas
 
                 if (data.category) {
                     if (!merchantCategoryCounts[m]) {
                         merchantCategoryCounts[m] = {};
                     }
                     const category = data.category;
-                    merchantCategoryCounts[m][category] = (merchantCategoryCounts[m][category] || 0) + 1;
+                    merchantCategoryCounts[m.toLowerCase()][category.toLowerCase()] = (merchantCategoryCounts[m.toLowerCase()][category.toLowerCase()] || 0) + 1; // Normalizar a minúsculas
                 }
             }
             // Recopilar Productos
-            if (data.product) {
-                products.add(data.product.trim());
+            if (data.product) { // Normalizar a minúsculas
+                products.add(data.product.trim().toLowerCase());
             }
         });
 
@@ -642,7 +643,7 @@ async function loadManualEntrySuggestions() {
             const categories = merchantCategoryCounts[merchant];
             // Encontrar la categoría con el recuento más alto
             const mostFrequentCategory = Object.keys(categories).reduce((a, b) => categories[a] > categories[b] ? a : b);
-            merchantCategoryMap[merchant] = mostFrequentCategory;
+            merchantCategoryMap[merchant.toLowerCase()] = mostFrequentCategory.toLowerCase(); // Normalizar a minúsculas
         }
 
         // Rellenar Datalist Comercios
@@ -667,10 +668,15 @@ async function loadManualEntrySuggestions() {
 
 // Evento para autocompletar categoría al elegir comercio
 manualMerchant.addEventListener('input', () => {
-    const merchant = manualMerchant.value.trim();
+    const merchant = manualMerchant.value.trim().toLowerCase(); // Normalizar a minúsculas
     if (merchantCategoryMap[merchant]) {
         manualCategory.value = merchantCategoryMap[merchant];
     }
+});
+
+// Al cambiar la fecha del gasto, actualizar por defecto la fecha de pago
+manualDate.addEventListener('change', () => {
+    manualPaymentDate.value = manualDate.value;
 });
 
 manualEntryCard.addEventListener('click', () => {
@@ -678,6 +684,7 @@ manualEntryCard.addEventListener('click', () => {
     // Poner fecha de hoy por defecto
     const today = new Date().toISOString().split('T')[0];
     manualDate.value = today;
+    manualPaymentDate.value = today;
     
     // Cargar sugerencias
     loadManualEntrySuggestions();
@@ -688,12 +695,13 @@ closeManualBtn.addEventListener('click', () => {
 });
 
 saveManualDirectBtn.addEventListener('click', async () => {
-    const merchant = manualMerchant.value.trim();
+    const merchant = manualMerchant.value.trim().toLowerCase(); // Normalizar a minúsculas
     const date = manualDate.value;
-    const product = manualProduct.value.trim();
-    const category = manualCategory.value;
-    const amount = parseFloat(manualAmount.value);
-    const bank = manualBank.value.trim();
+    const paymentDate = manualPaymentDate.value;
+    const product = manualProduct.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const category = manualCategory.value.toLowerCase(); // Normalizar a minúsculas
+    const amount = parseFloat(manualAmount.value); // Ya es número
+    const bank = manualBank.value.trim().toLowerCase(); // Normalizar a minúsculas
     const level0 = globalLevel0Input.value; // Usamos la Zona seleccionada en la pantalla principal
 
     if (!merchant || !date || !product || !bank || isNaN(amount)) {
@@ -710,7 +718,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
         category,
         amount,
         uid: currentUser.uid, // IMPORTANTE: Asociar al usuario
-        paymentDate: date // Por defecto, la misma fecha de la compra
+        paymentDate: paymentDate || date // Usar la fecha de pago seleccionada o la de la compra
     };
 
     try {

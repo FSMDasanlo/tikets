@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- CONFIGURACIÓN DE FIREBASE (Copiada de script.js) ---
@@ -117,59 +117,6 @@ function showCustomConfirm(message) {
     });
 }
 
-// --- FUNCIÓN DE PROMPT DE FECHA PERSONALIZADA ---
-function showDatePrompt(message) {
-    return new Promise((resolve) => {
-        let modal = document.getElementById('datePromptModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'datePromptModal';
-            modal.className = 'modal-overlay';
-            modal.style.zIndex = '9998';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 400px; text-align: center;">
-                    <h3 style="margin-top: 0; color: #333; margin-bottom: 15px;">Confirmar Pago Masivo</h3>
-                    <p id="datePromptMessage" style="color: #666; margin-bottom: 15px; font-size: 1.1rem;"></p>
-                    <div class="form-group" style="margin-bottom: 25px;">
-                        <input type="date" id="promptDateInput" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem;">
-                    </div>
-                    <div class="modal-actions" style="justify-content: center; gap: 15px;">
-                        <button id="datePromptBtnOk" class="btn-save" style="width: auto; margin: 0; min-width: 100px;">Aceptar</button>
-                        <button id="datePromptBtnCancel" class="btn-close" style="background-color: #6c757d; width: auto; margin: 0; min-width: 100px;">Cancelar</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-
-        const msgElement = document.getElementById('datePromptMessage');
-        const dateInput = document.getElementById('promptDateInput');
-        const btnOk = document.getElementById('datePromptBtnOk');
-        const btnCancel = document.getElementById('datePromptBtnCancel');
-
-        msgElement.textContent = message;
-        dateInput.value = new Date().toISOString().split('T')[0]; // Hoy por defecto
-        
-        modal.style.display = 'flex';
-        void modal.offsetWidth;
-        modal.classList.add('show');
-        dateInput.focus();
-
-        const closePrompt = (result) => {
-            modal.classList.remove('show');
-            setTimeout(() => { modal.style.display = 'none'; resolve(result); }, 300);
-        };
-
-        const newBtnOk = btnOk.cloneNode(true);
-        const newBtnCancel = btnCancel.cloneNode(true);
-        btnOk.parentNode.replaceChild(newBtnOk, btnOk);
-        btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
-
-        newBtnOk.addEventListener('click', () => closePrompt(dateInput.value));
-        newBtnCancel.addEventListener('click', () => closePrompt(null));
-    });
-}
-
 // Elementos del DOM
 const searchBtn = document.getElementById('searchBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn'); // Botón para limpiar filtros
@@ -189,7 +136,6 @@ const btnViewEvolution = document.getElementById('btnViewEvolution');
 const btnViewByCategory = document.getElementById('btnViewByCategory');
 const btnViewByConcept = document.getElementById('btnViewByConcept');
 const btnExportPDF = document.getElementById('btnExportPDF');
-const btnPayAllToday = document.getElementById('btnPayAllToday');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
@@ -271,24 +217,18 @@ async function loadFilterOptions() {
     try {
         // Solo cargar opciones de MIS gastos
         const querySnapshot = await getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid)));
-        const merchants = new Set();
-        const products = new Set();
-        const banks = new Set();
+        const merchants = new Set(); // Para almacenar comercios únicos
+        const products = new Set(); // Para almacenar productos únicos
+        const banks = new Set(); // Para almacenar bancos únicos
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.merchant) {
-                merchants.add(data.merchant.trim());
-            }
-            if (data.bank) {
-                banks.add(data.bank.trim());
-            }
+            if (data.merchant) merchants.add(data.merchant.trim().toLowerCase()); // Normalizar a minúsculas
+            if (data.bank) banks.add(data.bank.trim().toLowerCase()); // Normalizar a minúsculas
         });
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.product) {
-                products.add(data.product.trim());
-            }
+            if (data.product) products.add(data.product.trim().toLowerCase()); // Normalizar a minúsculas
         });
 
         const sortedMerchants = Array.from(merchants).sort();
@@ -298,7 +238,7 @@ async function loadFilterOptions() {
         merchantSelect.innerHTML = '<option value="">Todos</option>';
         sortedMerchants.forEach(m => {
             const option = document.createElement('option');
-            option.value = m;
+            option.value = m; // El valor ya está en minúsculas
             option.textContent = m;
             merchantSelect.appendChild(option);
         });
@@ -306,7 +246,7 @@ async function loadFilterOptions() {
         productSelect.innerHTML = '<option value="">Todos</option>';
         sortedProducts.forEach(p => {
             const option = document.createElement('option');
-            option.value = p;
+            option.value = p; // El valor ya está en minúsculas
             option.textContent = p;
             productSelect.appendChild(option);
         });
@@ -315,7 +255,7 @@ async function loadFilterOptions() {
             bankSelect.innerHTML = '<option value="">Todos</option>';
             sortedBanks.forEach(b => {
                 const option = document.createElement('option');
-                option.value = b;
+                option.value = b; // El valor ya está en minúsculas
                 option.textContent = b;
                 bankSelect.appendChild(option);
             });
@@ -358,15 +298,13 @@ async function loadConfig() {
             filterCat.innerHTML = '<option value="">Todas</option>';
             editCat.innerHTML = '';
             
-            catsSnap.forEach(doc => {
+            catsSnap.forEach(doc => { // Las categorías se guardan en minúsculas
                 const name = doc.data().name;
                 const color = doc.data().color;
-                filterCat.innerHTML += `<option value="${name}">${name}</option>`;
-                editCat.innerHTML += `<option value="${name}">${name}</option>`;
+                filterCat.innerHTML += `<option value="${name}">${name}</option>`; // El valor ya está en minúsculas
+                editCat.innerHTML += `<option value="${name}">${name}</option>`; // El valor ya está en minúsculas
                 
-                if (color) {
-                    categoryColors[name] = color;
-                }
+                if (color) categoryColors[name] = color; // La clave ya está en minúsculas
             });
         }
 
@@ -385,10 +323,10 @@ async function searchExpenses() {
     resultsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">⏳ Cargando datos de la nube...</td></tr>';
     
     const level0 = document.getElementById('filterLevel0').value;
-    const merchant = document.getElementById('filterMerchant').value; // Corregido: era 'filterMerchant'
-    const product = document.getElementById('filterProduct').value;
-    const category = document.getElementById('filterCategory').value;
-    const bank = document.getElementById('filterBank').value;
+    const merchant = document.getElementById('filterMerchant').value.toLowerCase(); // Normalizar a minúsculas
+    const product = document.getElementById('filterProduct').value.toLowerCase(); // Normalizar a minúsculas
+    const category = document.getElementById('filterCategory').value.toLowerCase(); // Normalizar a minúsculas
+    const bank = document.getElementById('filterBank').value.toLowerCase(); // Normalizar a minúsculas
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
     const showReturns = document.getElementById('filterReturns').checked;
@@ -407,8 +345,9 @@ async function searchExpenses() {
             let incomeTotal = 0;
             incomeSnap.forEach(doc => {
                 const data = doc.data();
-                if (dateStart && data.date < dateStart) return;
-                if (dateEnd && data.date > dateEnd) return;
+                let d = data.date;
+                if (dateStart && d < dateStart) return;
+                if (dateEnd && d > dateEnd) return;
                 incomeTotal += parseFloat(data.amount) || 0;
                 allIncomes.push({ id: doc.id, ...doc.data() });
             });
@@ -445,16 +384,16 @@ async function searchExpenses() {
             if (level0 && item.level0 !== level0) return false;
             
             // 2. Filtro Categoría
-            if (category && item.category !== category) return false;
+            if (category && (item.category || "").toLowerCase() !== category) return false;
             
             // Filtro Banco
-            if (bank && item.bank !== bank) return false;
+            if (bank && (item.bank || "").toLowerCase() !== bank) return false;
 
             // 3. Filtro Comercio
-            if (merchant && item.merchant !== merchant) return false;
+            if (merchant && (item.merchant || "").toLowerCase() !== merchant) return false;
             
             // 4. Filtro Concepto
-            if (product && item.product !== product) return false;
+            if (product && (item.product || "").toLowerCase() !== product) return false;
 
             // 5. Filtro Devoluciones (si está marcado)
             if (showReturns && (parseFloat(item.amount) || 0) >= 0) return false;
@@ -598,14 +537,14 @@ function renderTable() {
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="date" style="cursor: pointer; width: 110px;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="date" style="cursor: pointer; width: 95px; white-space: nowrap;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
-                <th data-sort="paymentDate" style="cursor: pointer; width: 110px;">Fecha Pago${getSortIcon('paymentDate')}</th>
-                <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
+                <th data-sort="paymentDate" style="cursor: pointer; width: 85px; white-space: nowrap; text-align: center;">Fecha Pago${getSortIcon('paymentDate')}</th>
+                <th data-sort="bank" style="cursor: pointer; width: 115px;">Banco${getSortIcon('bank')}</th>
                 <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
-                <th data-sort="product" style="cursor: pointer; width: 20%;">Concepto${getSortIcon('product')}</th>
+                <th data-sort="product" style="cursor: pointer; width: 15%;">Concepto${getSortIcon('product')}</th>
                 <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
-                <th data-sort="amount" style="cursor: pointer;">Importe${getSortIcon('amount')}</th>
+                <th data-sort="amount" style="cursor: pointer; width: 120px; text-align: right; white-space: nowrap;">Importe${getSortIcon('amount')}</th>
                 <th style="width: 125px;">Acciones</th>
             </tr>
         `;
@@ -615,11 +554,11 @@ function renderTable() {
             const amount = parseFloat(item.amount) || 0;
             totalAmount += amount;
 
-            // Formatear fecha de YYYY-MM-DD a DD-MM-YYYY
+            // Formatear fecha de YYYY-MM-DD a DD/MM/YY
             let displayDate = item.date;
             if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [y, m, d] = displayDate.split('-');
-                displayDate = `${d}-${m}-${y}`;
+                displayDate = `${d}/${m}/${y.slice(-2)}`;
             }
 
             // Sombreado verde si es negativo (devolución)
@@ -631,18 +570,18 @@ function renderTable() {
             let displayPaymentDate = item.paymentDate;
             if (displayPaymentDate && displayPaymentDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [y, m, d] = displayPaymentDate.split('-');
-                displayPaymentDate = `${d}-${m}-${y}`;
+                displayPaymentDate = `${d}/${m}/${y.slice(-2)}`;
             }
 
             row.innerHTML = `
-                <td data-label="Fecha">${displayDate}</td>
+                <td data-label="Fecha" style="white-space: nowrap;">${displayDate}</td>
                 <td data-label="Zona">${item.level0 || '-'}</td>
-                <td data-label="Fecha Pago">${displayPaymentDate || '-'}</td>
+                <td data-label="Fecha Pago" style="white-space: nowrap; text-align: center;">${displayPaymentDate || '-'}</td>
                 <td data-label="Banco">${item.bank || '-'}</td> 
                 <td data-label="Comercio">${item.merchant}</td>
                 <td data-label="Concepto">${item.product}</td>
                 <td data-label="Categoría">${item.category}</td>
-                <td data-label="Importe" style="text-align: right; font-weight: bold;">${formatCurrency(amount)}</td>
+                <td data-label="Importe" style="text-align: right; font-weight: bold; white-space: nowrap;">${formatCurrency(amount)}</td>
                 <td data-label="Acciones" style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745;" title="Duplicar">📄</button>
                     <button class="action-btn btn-edit" data-id="${item.id}" title="Editar">✏️</button>
@@ -657,13 +596,13 @@ function renderTable() {
         // Actualizar Cabecera
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="date" style="cursor: pointer; width: 110px;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="date" style="cursor: pointer; width: 95px; white-space: nowrap;">Fecha${getSortIcon('date')}</th>
                 <th data-sort="level0" style="cursor: pointer;">Zona${getSortIcon('level0')}</th>
-                <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
-                <th data-sort="merchant" style="cursor: pointer;">Comercio${getSortIcon('merchant')}</th>
+                <th data-sort="bank" style="cursor: pointer; width: 115px;">Banco${getSortIcon('bank')}</th>
+                <th data-sort="merchant" style="cursor: pointer; width: 15%;">Comercio${getSortIcon('merchant')}</th>
                 <th style="width: 20%;">Concepto</th>
                 <th>Categoría</th>
-                <th data-sort="amount" style="cursor: pointer;">Importe Total${getSortIcon('amount')}</th>
+                <th data-sort="amount" style="cursor: pointer; width: 130px; text-align: right; white-space: nowrap;">Importe Total${getSortIcon('amount')}</th>
                 <th style="width: 125px;">Acciones</th>
             </tr>
         `;
@@ -721,25 +660,25 @@ function renderTable() {
             // Convertimos el array de IDs a string para pasarlo al botón (o usamos un índice)
             const idsString = JSON.stringify(group.ids);
 
-            // Formatear fecha de YYYY-MM-DD a DD-MM-YYYY
+            // Formatear fecha de YYYY-MM-DD a DD/MM/YY
             let displayDate = group.date;
             if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [y, m, d] = displayDate.split('-');
-                displayDate = `${d}-${m}-${y}`;
+                displayDate = `${d}/${m}/${y.slice(-2)}`;
             }
 
             // Obtener conceptos y categorías únicos para mostrar en la fila resumen
             const concepts = [...new Set(group.items.map(i => i.product))].join(', ');
             const categories = [...new Set(group.items.map(i => i.category))].join(', ');
-
+            
             row.innerHTML = `
-                <td data-label="Fecha">${displayDate}</td>
+                <td data-label="Fecha" style="white-space: nowrap;">${displayDate}</td>
                 <td data-label="Zona">${group.level0 || '-'}</td>
                 <td data-label="Banco">${group.bank === 'N/A' ? '-' : group.bank}</td>
                 <td data-label="Comercio">${group.merchant}</td>
                 <td data-label="Conceptos" style="font-size: 0.9rem; color: #555;">${concepts}</td>
                 <td data-label="Categorías" style="font-size: 0.9rem; color: #555;">${categories}</td>
-                <td data-label="Total" style="text-align: right; font-weight: bold;">${formatCurrency(group.amount)}</td>
+                <td data-label="Total" style="text-align: right; font-weight: bold; white-space: nowrap;">${formatCurrency(group.amount)}</td>
                 <td data-label="Acciones" style="text-align: center; white-space: nowrap;">
                     <button class="action-btn btn-view-group" style="background-color: #17a2b8; margin-right: 5px;" title="Ver Detalle">👁️</button>
                     <button class="action-btn btn-delete-group" data-ids='${idsString}' title="Borrar Ticket Completo">🗑️</button>
@@ -836,7 +775,7 @@ function renderTable() {
             totalAmount += amount;
 
             // Obtener color de la categoría si existe
-            const dotColor = categoryColors[cat] || '#ccc';
+            const dotColor = categoryColors[cat] || '#ccc'; // cat ya está en minúsculas
 
             row.innerHTML = `
                 <td data-label="Categoría" style="font-weight: bold;">
@@ -851,7 +790,7 @@ function renderTable() {
                 currentViewMode = 'detail';
                 updateActiveViewButton('btnViewDetail');
                 // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle
-                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === cat);
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'sin categoría') === cat); // cat ya está en minúsculas
                 renderTable();
             });
 
@@ -907,8 +846,8 @@ function renderTable() {
                 drillDownViewMode = 'category';
                 currentViewMode = 'detail';
                 updateActiveViewButton('btnViewDetail');
-                // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle
-                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === cat);
+                // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle (por concepto)
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.product || 'sin concepto') === prod); // prod ya está en minúsculas
                 renderTable();
             });
 
@@ -918,11 +857,11 @@ function renderTable() {
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot && currentViewMode !== 'evolution' && currentViewMode !== 'accounts') { // No mostrar en evolución o cuentas
-        const colspan = currentViewMode === 'detail' ? 7 : 6;
+        const colspan = 6; // Ahora ambos modos tienen 6 columnas antes del importe
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
-                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: #007bff;">${formatCurrency(totalAmount)}</td>
+                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: #007bff; white-space: nowrap;">${formatCurrency(totalAmount)}</td>
                 <td></td>
             </tr>
         `;
@@ -951,43 +890,6 @@ function renderTable() {
             btn.addEventListener('click', (e) => openDuplicateModal(e.target.dataset.id, currentFilteredDocs));
         });
     updateStats(); // Actualizar estadísticas con los datos visibles
-}
-
-// Función para pagar todos los gastos pendientes en la selección actual
-if (btnPayAllToday) {
-    btnPayAllToday.addEventListener('click', async () => {
-        // Solo tiene sentido si hay resultados y no estamos en vistas especiales como evolución
-        if (currentViewMode === 'evolution' || currentViewMode === 'accounts') {
-            showCustomAlert("Esta función no está disponible en la vista actual.", "neutral");
-            return;
-        }
-
-        const pending = currentFilteredDocs.filter(item => !item.paymentDate);
-        
-        if (pending.length === 0) {
-            showCustomAlert("No hay gastos pendientes de pago en los resultados actuales.", "neutral");
-            return;
-        }
-
-        const selectedDate = await showDatePrompt(`Se marcarán como pagados ${pending.length} gastos. Elige la fecha de cargo:`);
-        if (!selectedDate) return;
-        
-        try {
-            btnPayAllToday.disabled = true;
-            btnPayAllToday.textContent = "Procesando...";
-            const batch = writeBatch(db);
-            pending.forEach(item => batch.update(doc(db, "expenses", item.id), { paymentDate: selectedDate }));
-            await batch.commit();
-            showCustomAlert(`✅ Se han actualizado ${pending.length} gastos con fecha de pago ${selectedDate}.`, "success");
-            searchExpenses(); // Refrescar la tabla para ver los cambios
-        } catch (error) {
-            console.error("Error al pagar todo hoy:", error);
-            showCustomAlert("Error al actualizar: " + error.message, "error");
-        } finally {
-            btnPayAllToday.disabled = false;
-            btnPayAllToday.innerHTML = '<i class="fa-solid fa-check-double"></i>Pagar todo hoy';
-        }
-    });
 }
 
 // Función para renderizar el gráfico circular
@@ -1159,7 +1061,7 @@ function openEditModal(id, allDocs) {
     document.getElementById('editId').value = id;
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
     document.getElementById('editMerchant').value = item.merchant;
-    document.getElementById('editBank').value = item.bank || '';
+    document.getElementById('editBank').value = item.bank || ''; // Se muestra como está guardado (minúsculas)
     
     // CORRECCIÓN DE FECHA: Si viene en formato antiguo DD/MM/YYYY, convertir a YYYY-MM-DD
     let dateValue = item.date;
@@ -1168,10 +1070,10 @@ function openEditModal(id, allDocs) {
         dateValue = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     document.getElementById('editDate').value = dateValue;
-    document.getElementById('editPaymentDate').value = item.paymentDate || dateValue; // Default a la fecha de compra
+    document.getElementById('editPaymentDate').value = item.paymentDate || '';
     
-    document.getElementById('editProduct').value = item.product;
-    document.getElementById('editCategory').value = item.category;
+    document.getElementById('editProduct').value = item.product; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editCategory').value = item.category; // Se muestra como está guardado (minúsculas)
     document.getElementById('editAmount').value = item.amount;
 
     editModalOverlay.style.display = 'flex';
@@ -1188,7 +1090,7 @@ function openDuplicateModal(id, allDocs) {
     document.getElementById('editId').value = ""; // ID vacío indica creación
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
     document.getElementById('editMerchant').value = item.merchant;
-    document.getElementById('editBank').value = item.bank || '';
+    document.getElementById('editBank').value = item.bank || ''; // Se muestra como está guardado (minúsculas)
     
     let dateValue = item.date;
     if (dateValue && dateValue.includes('/')) {
@@ -1196,10 +1098,10 @@ function openDuplicateModal(id, allDocs) {
         dateValue = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     document.getElementById('editDate').value = dateValue;
-    document.getElementById('editPaymentDate').value = item.paymentDate || dateValue; // Default a la fecha de compra
+    document.getElementById('editPaymentDate').value = item.paymentDate || '';
     
-    document.getElementById('editProduct').value = item.product;
-    document.getElementById('editCategory').value = item.category;
+    document.getElementById('editProduct').value = item.product; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editCategory').value = item.category; // Se muestra como está guardado (minúsculas)
     document.getElementById('editAmount').value = item.amount;
 
     editModalOverlay.style.display = 'flex';
@@ -1210,11 +1112,11 @@ saveEditBtn.addEventListener('click', async () => {
     const id = document.getElementById('editId').value;
     const updatedData = {
         level0: document.getElementById('editLevel0').value,
-        merchant: document.getElementById('editMerchant').value,
-        bank: document.getElementById('editBank').value.trim(),
+        merchant: document.getElementById('editMerchant').value.trim().toLowerCase(), // Normalizar a minúsculas
+        bank: document.getElementById('editBank').value.trim().toLowerCase(), // Normalizar a minúsculas
         date: document.getElementById('editDate').value,
-        product: document.getElementById('editProduct').value,
-        category: document.getElementById('editCategory').value,
+        product: document.getElementById('editProduct').value.toLowerCase(), // Normalizar a minúsculas
+        category: document.getElementById('editCategory').value.toLowerCase(), // Normalizar a minúsculas
         amount: parseFloat(document.getElementById('editAmount').value),
         paymentDate: document.getElementById('editPaymentDate').value || null // Guardar la fecha de pago
     };
@@ -1454,7 +1356,7 @@ if(searchBtn) {
                         let displayDate = mov.date;
                         if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
                             const [y, m, d] = displayDate.split('-');
-                            displayDate = `${d}-${m}-${y}`;
+                            displayDate = `${d}/${m}/${y.slice(-2)}`;
                         }
                         detailsHtml += `<tr><td style="padding: 8px;">${displayDate}</td><td style="padding: 8px;">${concept}</td><td style="padding: 8px; text-align: right; color: ${color};">${mov.type === 'expense' ? '-' : ''}${formatCurrency(amount)}</td></tr>`;
                     });
@@ -1637,7 +1539,7 @@ async function exportToPDF() {
         const groups = {};
         currentFilteredDocs.forEach(item => {
             const key = `${item.date}|${item.merchant}|${item.level0}|${item.bank || 'N/A'}`;
-            if (!groups[key]) {
+            if (!groups[key]) { // La clave ya está en minúsculas
                 groups[key] = { date: item.date, merchant: item.merchant, level0: item.level0, bank: item.bank || 'N/A', amount: 0 };
             }
             groups[key].amount += parseFloat(item.amount) || 0;
@@ -1650,7 +1552,7 @@ async function exportToPDF() {
         const groups = {};
         currentFilteredDocs.forEach(item => {
             const key = isCat ? (item.category || 'Sin Categoría') : (item.product || 'Sin Concepto');
-            groups[key] = (groups[key] || 0) + (parseFloat(item.amount) || 0);
+            groups[key] = (groups[key] || 0) + (parseFloat(item.amount) || 0); // La clave ya está en minúsculas
         });
         body = Object.entries(groups)
             .sort((a, b) => b[1] - a[1])

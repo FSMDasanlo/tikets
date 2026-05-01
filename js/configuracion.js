@@ -244,7 +244,7 @@ async function addItem(inputElement, collectionName, listElement) {
   if (!name) return;
 
   // Convertir a mayúsculas si es Zona para mantener consistencia
-  const finalName = collectionName === "levels" ? name.toUpperCase() : name;
+  const finalName = collectionName === "levels" ? name.toUpperCase() : name.toLowerCase(); // Normalizar categorías a minúsculas
 
   try {
     // VALIDACIÓN DE DUPLICADOS
@@ -283,7 +283,7 @@ async function deleteItem(id, name, collectionName, listElement) {
       // Consultamos si hay gastos que usen esta categoría
       const q = query(
         collection(db, "expenses"),
-        where("category", "==", name),
+        where("category", "==", name.toLowerCase()), // Comparar en minúsculas
         where("uid", "==", currentUser.uid),
       );
       const snapshot = await getDocs(q);
@@ -343,7 +343,7 @@ saveConfigEditBtn.addEventListener("click", async () => {
 
   if (!newName) return;
 
-  const finalName = type === "levels" ? newName.toUpperCase() : newName;
+  const finalName = type === "levels" ? newName.toUpperCase() : newName.toLowerCase(); // Normalizar categorías a minúsculas
   const updateData = { name: finalName };
 
   if (type === "categories" && editItemColor) {
@@ -358,7 +358,7 @@ saveConfigEditBtn.addEventListener("click", async () => {
     if (type === "categories" && finalName !== currentOriginalName) {
       const q = query(
         collection(db, "expenses"),
-        where("category", "==", currentOriginalName),
+        where("category", "==", currentOriginalName.toLowerCase()), // Comparar en minúsculas
         where("uid", "==", currentUser.uid),
       );
       const querySnapshot = await getDocs(q);
@@ -490,8 +490,8 @@ if (fixBankBtn) {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         // Si el campo banco no existe, es null o está vacío, lo marcamos para actualizar
-        if (!data.bank || data.bank.trim() === "") {
-          batch.update(docSnap.ref, { bank: "CAIXA" });
+        if (!data.bank || data.bank.trim().toLowerCase() === "") { // Comparar en minúsculas
+          batch.update(docSnap.ref, { bank: "caixa" }); // Guardar en minúsculas
           count++;
         }
       });
