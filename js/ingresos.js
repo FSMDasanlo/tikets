@@ -194,7 +194,7 @@ if (btnAddIncome) {
     }
 
     const date = addDate.value;
-    const bank = addBank.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const bank = addBank.value.trim().toUpperCase(); 
     const concept = addConcept.value.trim().toLowerCase(); // Normalizar a minúsculas
     const amount = parseFloat(addAmount.value);
 
@@ -276,13 +276,13 @@ async function searchIncomes() {
     // Aplicar Filtros
     const fDateStart = filterDateStart ? filterDateStart.value : "";
     const fDateEnd = filterDateEnd ? filterDateEnd.value : "";
-    const fBank = filterBank ? filterBank.value.toLowerCase().trim() : ""; // Ya está en minúsculas
+    const fBank = filterBank ? filterBank.value.toUpperCase().trim() : ""; 
     const fConcept = filterConcept ? filterConcept.value.toLowerCase().trim() : ""; // Ya está en minúsculas
 
     const filteredIncomes = incomes.filter((item) => {
       if (fDateStart && item.date < fDateStart) return false;
       if (fDateEnd && item.date > fDateEnd) return false;
-      if (fBank && !item.bank.includes(fBank)) return false; // item.bank ya está en minúsculas
+      if (fBank && !item.bank.toUpperCase().includes(fBank)) return false; 
       if (fConcept && !item.concept.includes(fConcept)) return false; // item.concept ya está en minúsculas
       return true;
     });
@@ -351,7 +351,7 @@ function renderTable(data) {
     const row = document.createElement("tr");
     row.innerHTML = `
             <td data-label="Fecha">${displayDate}</td>
-            <td data-label="Banco">${item.bank}</td> <!-- Se muestra como está guardado (minúsculas) -->
+            <td data-label="Banco">${item.bank}</td> 
             <td data-label="Concepto">${item.concept}</td> <!-- Se muestra como está guardado (minúsculas) -->
             <td data-label="Importe" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
             <td data-label="Acciones" style="text-align: center;">
@@ -411,8 +411,8 @@ function openEditModal(id) {
 
   editIncomeId.value = id;
   editIncomeDate.value = item.date;
-  editIncomeBank.value = item.bank; // Se muestra como está guardado (minúsculas)
-  editIncomeConcept.value = item.concept; // Se muestra como está guardado (minúsculas)
+  editIncomeBank.value = (item.bank || '').toUpperCase(); 
+  editIncomeConcept.value = (item.concept || '').toLowerCase(); 
   editIncomeAmount.value = item.amount;
 
   editIncomeModal.style.display = "flex";
@@ -428,8 +428,8 @@ function openDuplicateModal(id) {
 
   editIncomeId.value = ""; // ID vacío indica creación
   editIncomeDate.value = item.date; // Mantiene fecha original (usuario puede cambiarla)
-  editIncomeBank.value = item.bank; // Se muestra como está guardado (minúsculas)
-  editIncomeConcept.value = item.concept; // Se muestra como está guardado (minúsculas)
+  editIncomeBank.value = (item.bank || '').toUpperCase(); 
+  editIncomeConcept.value = (item.concept || '').toLowerCase(); 
   editIncomeAmount.value = item.amount;
 
   editIncomeModal.style.display = "flex";
@@ -440,7 +440,7 @@ if (saveIncomeEditBtn) {
   saveIncomeEditBtn.addEventListener("click", async () => {
     const id = editIncomeId.value;
     const date = editIncomeDate.value;
-    const bank = editIncomeBank.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const bank = editIncomeBank.value.trim().toUpperCase(); 
     const concept = editIncomeConcept.value.trim().toLowerCase(); // Normalizar a minúsculas
     const amount = parseFloat(editIncomeAmount.value);
 
@@ -507,7 +507,7 @@ async function loadIncomeSuggestions() {
 
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.bank) banks.add(data.bank.trim().toLowerCase()); // Normalizar a minúsculas
+      if (data.bank) banks.add(data.bank.trim().toUpperCase()); 
       if (data.concept) concepts.add(data.concept.trim().toLowerCase()); // Normalizar a minúsculas
     });
 

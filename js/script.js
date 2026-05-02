@@ -90,8 +90,8 @@ async function loadBankSuggestions() {
         const [expensesSnap, incomesSnap] = await Promise.all([ getDocs(expensesQuery), getDocs(incomesQuery) ]);
 
         const banks = new Set();
-        expensesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
-        incomesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim()));
+        expensesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim().toUpperCase()));
+        incomesSnap.forEach(doc => doc.data().bank && banks.add(doc.data().bank.trim().toUpperCase()));
 
         bankDatalist.innerHTML = '<option value=""></option>'; // Opción vacía para limpiar
         Array.from(banks).sort().forEach(bank => {
@@ -280,7 +280,7 @@ async function saveDataToDb() {
             level0: level0,
             merchant: merchant,
             date: date,
-            bank: bank.toLowerCase(), // Normalizar a minúsculas
+            bank: bank.toUpperCase(), 
             product: cells[0].innerText.toLowerCase(), // Normalizar a minúsculas
             category: categorySelect.value.toLowerCase(), // Normalizar a minúsculas
             amount: amountVal, // Guardamos como número
@@ -701,7 +701,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
     const product = manualProduct.value.trim().toLowerCase(); // Normalizar a minúsculas
     const category = manualCategory.value.toLowerCase(); // Normalizar a minúsculas
     const amount = parseFloat(manualAmount.value); // Ya es número
-    const bank = manualBank.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const bank = manualBank.value.trim().toUpperCase(); 
     const level0 = globalLevel0Input.value; // Usamos la Zona seleccionada en la pantalla principal
 
     if (!merchant || !date || !product || !bank || isNaN(amount)) {

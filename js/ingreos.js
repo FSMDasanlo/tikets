@@ -77,7 +77,7 @@ if (btnAddIncome) {
         }
 
         const date = addDate.value;
-        const bank = addBank.value.trim();
+        const bank = addBank.value.trim().toUpperCase();
         const concept = addConcept.value.trim();
         const amount = parseFloat(addAmount.value);
 
@@ -147,13 +147,13 @@ async function searchIncomes() {
         // Aplicar Filtros
         const fDateStart = filterDateStart ? filterDateStart.value : '';
         const fDateEnd = filterDateEnd ? filterDateEnd.value : '';
-        const fBank = filterBank ? filterBank.value.toLowerCase().trim() : '';
+        const fBank = filterBank ? filterBank.value.toUpperCase().trim() : '';
         const fConcept = filterConcept ? filterConcept.value.toLowerCase().trim() : '';
 
         const filteredIncomes = incomes.filter(item => {
             if (fDateStart && item.date < fDateStart) return false;
             if (fDateEnd && item.date > fDateEnd) return false;
-            if (fBank && !item.bank.toLowerCase().includes(fBank)) return false;
+            if (fBank && !item.bank.toUpperCase().includes(fBank)) return false;
             if (fConcept && !item.concept.toLowerCase().includes(fConcept)) return false;
             return true;
         });

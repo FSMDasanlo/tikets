@@ -224,7 +224,7 @@ async function loadFilterOptions() {
         querySnapshot.forEach((doc) => {
             const data = doc.data();
             if (data.merchant) merchants.add(data.merchant.trim().toLowerCase()); // Normalizar a minúsculas
-            if (data.bank) banks.add(data.bank.trim().toLowerCase()); // Normalizar a minúsculas
+            if (data.bank) banks.add(data.bank.trim().toUpperCase()); 
         });
         querySnapshot.forEach((doc) => {
             const data = doc.data();
@@ -301,10 +301,11 @@ async function loadConfig() {
             catsSnap.forEach(doc => { // Las categorías se guardan en minúsculas
                 const name = doc.data().name;
                 const color = doc.data().color;
-                filterCat.innerHTML += `<option value="${name}">${name}</option>`; // El valor ya está en minúsculas
-                editCat.innerHTML += `<option value="${name}">${name}</option>`; // El valor ya está en minúsculas
+                const lowerName = name.toLowerCase();
+                filterCat.innerHTML += `<option value="${lowerName}">${name}</option>`; 
+                editCat.innerHTML += `<option value="${lowerName}">${name}</option>`; 
                 
-                if (color) categoryColors[name] = color; // La clave ya está en minúsculas
+                if (color) categoryColors[lowerName] = color; 
             });
         }
 
@@ -326,7 +327,7 @@ async function searchExpenses() {
     const merchant = document.getElementById('filterMerchant').value.toLowerCase(); // Normalizar a minúsculas
     const product = document.getElementById('filterProduct').value.toLowerCase(); // Normalizar a minúsculas
     const category = document.getElementById('filterCategory').value.toLowerCase(); // Normalizar a minúsculas
-    const bank = document.getElementById('filterBank').value.toLowerCase(); // Normalizar a minúsculas
+    const bank = document.getElementById('filterBank').value.toUpperCase(); 
     const dateStart = document.getElementById('filterDateStart').value;
     const dateEnd = document.getElementById('filterDateEnd').value;
     const showReturns = document.getElementById('filterReturns').checked;
@@ -387,7 +388,7 @@ async function searchExpenses() {
             if (category && (item.category || "").toLowerCase() !== category) return false;
             
             // Filtro Banco
-            if (bank && (item.bank || "").toLowerCase() !== bank) return false;
+            if (bank && (item.bank || "").toUpperCase() !== bank) return false;
 
             // 3. Filtro Comercio
             if (merchant && (item.merchant || "").toLowerCase() !== merchant) return false;
@@ -741,15 +742,15 @@ function renderTable() {
     else if (currentViewMode === 'category') {
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
-                <th data-sort="amount" style="cursor: pointer; text-align: right;">Importe Total${getSortIcon('amount')}</th>
+                <th data-sort="category" style="cursor: pointer; width: 60%;">Categoría${getSortIcon('category')}</th>
+                <th data-sort="amount" style="cursor: pointer; width: 30%; text-align: right;">Importe Total${getSortIcon('amount')}</th>
                 <th style="width: 50px;"></th>
             </tr>
         `;
 
         const groups = {};
         currentFilteredDocs.forEach(item => {
-            const cat = item.category || 'Sin Categoría';
+            const cat = (item.category || 'sin categoría').toLowerCase();
             if (!groups[cat]) groups[cat] = 0;
             groups[cat] += parseFloat(item.amount) || 0;
         });
@@ -787,10 +788,11 @@ function renderTable() {
             `;
 
             row.addEventListener('click', () => {
+                drillDownViewMode = 'category';
                 currentViewMode = 'detail';
                 updateActiveViewButton('btnViewDetail');
                 // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle
-                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'sin categoría') === cat); // cat ya está en minúsculas
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'sin categoría').toLowerCase() === cat); 
                 renderTable();
             });
 
@@ -801,15 +803,15 @@ function renderTable() {
     else if (currentViewMode === 'concept') {
         resultsTableHead.innerHTML = `
             <tr>
-                <th data-sort="product" style="cursor: pointer;">Concepto${getSortIcon('product')}</th>
-                <th data-sort="amount" style="cursor: pointer; text-align: right;">Importe Total${getSortIcon('amount')}</th>
+                <th data-sort="product" style="cursor: pointer; width: 60%;">Concepto${getSortIcon('product')}</th>
+                <th data-sort="amount" style="cursor: pointer; width: 30%; text-align: right;">Importe Total${getSortIcon('amount')}</th>
                 <th style="width: 50px;"></th>
             </tr>
         `;
 
         const groups = {};
         currentFilteredDocs.forEach(item => {
-            const prod = item.product || 'Sin Concepto';
+            const prod = (item.product || 'sin concepto').toLowerCase();
             if (!groups[prod]) groups[prod] = 0;
             groups[prod] += parseFloat(item.amount) || 0;
         });
@@ -843,11 +845,11 @@ function renderTable() {
             `;
 
             row.addEventListener('click', () => {
-                drillDownViewMode = 'category';
+                drillDownViewMode = 'concept';
                 currentViewMode = 'detail';
                 updateActiveViewButton('btnViewDetail');
                 // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle (por concepto)
-                currentFilteredDocs = originalFilteredDocs.filter(item => (item.product || 'sin concepto') === prod); // prod ya está en minúsculas
+                currentFilteredDocs = originalFilteredDocs.filter(item => (item.product || 'sin concepto').toLowerCase() === prod); 
                 renderTable();
             });
 
@@ -857,7 +859,8 @@ function renderTable() {
 
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot && currentViewMode !== 'evolution' && currentViewMode !== 'accounts') { // No mostrar en evolución o cuentas
-        const colspan = 6; // Ahora ambos modos tienen 6 columnas antes del importe
+        // Ajustar colspan: Las vistas agrupadas tienen menos columnas que el detalle
+        const colspan = (currentViewMode === 'category' || currentViewMode === 'concept') ? 1 : 6;
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
                 <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
@@ -907,7 +910,7 @@ function renderChart() {
     // Calcular totales (por Categoría o por Comercio)
     const dataTotals = {};
     currentFilteredDocs.forEach(item => {
-        const key = isCategorySelected ? (item.merchant || 'Sin Comercio') : (item.category || 'Sin Categoría');
+        const key = isCategorySelected ? (item.merchant || 'sin comercio').toLowerCase() : (item.category || 'sin categoría').toLowerCase();
         const amount = parseFloat(item.amount) || 0;
         dataTotals[key] = (dataTotals[key] || 0) + amount;
     });
@@ -915,8 +918,11 @@ function renderChart() {
     // Ordenar de mayor a menor
     const sortedEntries = Object.entries(dataTotals).sort((a, b) => b[1] - a[1]);
 
-    // Crear etiquetas con el importe incluido
-    const labels = sortedEntries.map(([key, value]) => `${key}: ${formatCurrency(value)}`);
+    // Crear etiquetas con el importe incluido (Capitalizando la primera letra para estética)
+    const labels = sortedEntries.map(([key, value]) => {
+        const capitalized = key.charAt(0).toUpperCase() + key.slice(1);
+        return `${capitalized}: ${formatCurrency(value)}`;
+    });
     const data = sortedEntries.map(entry => entry[1]);
     
     // Mapear colores
@@ -972,10 +978,10 @@ function renderChart() {
                     // Filtramos sobre los datos ORIGINALES de la búsqueda
                     if (isCategorySelected) {
                         // Filtrar por comercio
-                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.merchant || 'Sin Comercio') === selectedKey);
+                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.merchant || 'sin comercio').toLowerCase() === selectedKey);
                     } else {
                         // Filtrar por categoría
-                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'Sin Categoría') === selectedKey);
+                        currentFilteredDocs = originalFilteredDocs.filter(item => (item.category || 'sin categoría').toLowerCase() === selectedKey);
                     }
                     renderTable();
                 } else {
@@ -1060,8 +1066,8 @@ function openEditModal(id, allDocs) {
 
     document.getElementById('editId').value = id;
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
-    document.getElementById('editMerchant').value = item.merchant;
-    document.getElementById('editBank').value = item.bank || ''; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editMerchant').value = (item.merchant || '').toLowerCase();
+    document.getElementById('editBank').value = (item.bank || '').toUpperCase(); 
     
     // CORRECCIÓN DE FECHA: Si viene en formato antiguo DD/MM/YYYY, convertir a YYYY-MM-DD
     let dateValue = item.date;
@@ -1072,8 +1078,8 @@ function openEditModal(id, allDocs) {
     document.getElementById('editDate').value = dateValue;
     document.getElementById('editPaymentDate').value = item.paymentDate || '';
     
-    document.getElementById('editProduct').value = item.product; // Se muestra como está guardado (minúsculas)
-    document.getElementById('editCategory').value = item.category; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editProduct').value = (item.product || '').toLowerCase(); 
+    document.getElementById('editCategory').value = (item.category || '').toLowerCase(); 
     document.getElementById('editAmount').value = item.amount;
 
     editModalOverlay.style.display = 'flex';
@@ -1089,8 +1095,8 @@ function openDuplicateModal(id, allDocs) {
 
     document.getElementById('editId').value = ""; // ID vacío indica creación
     document.getElementById('editLevel0').value = item.level0 || 'MADRID';
-    document.getElementById('editMerchant').value = item.merchant;
-    document.getElementById('editBank').value = item.bank || ''; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editMerchant').value = (item.merchant || '').toLowerCase();
+    document.getElementById('editBank').value = (item.bank || '').toUpperCase(); 
     
     let dateValue = item.date;
     if (dateValue && dateValue.includes('/')) {
@@ -1100,8 +1106,8 @@ function openDuplicateModal(id, allDocs) {
     document.getElementById('editDate').value = dateValue;
     document.getElementById('editPaymentDate').value = item.paymentDate || '';
     
-    document.getElementById('editProduct').value = item.product; // Se muestra como está guardado (minúsculas)
-    document.getElementById('editCategory').value = item.category; // Se muestra como está guardado (minúsculas)
+    document.getElementById('editProduct').value = (item.product || '').toLowerCase(); 
+    document.getElementById('editCategory').value = (item.category || '').toLowerCase(); 
     document.getElementById('editAmount').value = item.amount;
 
     editModalOverlay.style.display = 'flex';
@@ -1113,7 +1119,7 @@ saveEditBtn.addEventListener('click', async () => {
     const updatedData = {
         level0: document.getElementById('editLevel0').value,
         merchant: document.getElementById('editMerchant').value.trim().toLowerCase(), // Normalizar a minúsculas
-        bank: document.getElementById('editBank').value.trim().toLowerCase(), // Normalizar a minúsculas
+        bank: document.getElementById('editBank').value.trim().toUpperCase(), 
         date: document.getElementById('editDate').value,
         product: document.getElementById('editProduct').value.toLowerCase(), // Normalizar a minúsculas
         category: document.getElementById('editCategory').value.toLowerCase(), // Normalizar a minúsculas
@@ -1225,29 +1231,49 @@ if(searchBtn) {
     // Eventos botones de vista
     btnViewTotal.addEventListener('click', () => {
         currentViewMode = 'total';
+        drillDownViewMode = 'total';
         updateActiveViewButton('btnViewTotal');
-        currentFilteredDocs = [...originalFilteredDocs];
-        renderTable();
+        if (originalFilteredDocs.length === 0) {
+            searchExpenses();
+        } else {
+            currentFilteredDocs = [...originalFilteredDocs];
+            renderTable();
+        }
     });
     btnViewDetail.addEventListener('click', () => {
         currentViewMode = 'detail';
+        drillDownViewMode = 'detail';
         updateActiveViewButton('btnViewDetail');
-        currentFilteredDocs = [...originalFilteredDocs];
-        renderTable();
+        if (originalFilteredDocs.length === 0) {
+            searchExpenses();
+        } else {
+            currentFilteredDocs = [...originalFilteredDocs];
+            renderTable();
+        }
     });
     
     btnViewByCategory.addEventListener('click', () => {
         currentViewMode = 'category';
+        drillDownViewMode = 'category';
         updateActiveViewButton('btnViewByCategory');
-        currentFilteredDocs = [...originalFilteredDocs];
-        renderTable();
+        if (originalFilteredDocs.length === 0) {
+            searchExpenses();
+        } else {
+            currentFilteredDocs = [...originalFilteredDocs];
+            renderTable();
+        }
     });
 
     btnViewByConcept.addEventListener('click', () => {
         currentViewMode = 'concept';
+        drillDownViewMode = 'concept';
         updateActiveViewButton('btnViewByConcept');
-        currentFilteredDocs = [...originalFilteredDocs];
-        renderTable();
+        if (originalFilteredDocs.length === 0) {
+            searchExpenses();
+        } else {
+            currentFilteredDocs = [...originalFilteredDocs];
+            renderTable();
+        }
     });
 
     if (btnViewAccounts) {
@@ -1296,7 +1322,7 @@ if(searchBtn) {
                 const bankAccounts = {};
 
                 allExpenses.forEach(item => {
-                    const bank = item.bank || 'Sin Banco';
+                    const bank = item.bank || 'SIN BANCO';
                     if (!bankAccounts[bank]) {
                         bankAccounts[bank] = { incomes: 0, expenses: 0, movements: [] };
                     }
@@ -1305,7 +1331,7 @@ if(searchBtn) {
                 });
 
                 allIncomes.forEach(item => {
-                    const bank = item.bank || 'Sin Banco';
+                    const bank = item.bank || 'SIN BANCO';
                     if (!bankAccounts[bank]) {
                         bankAccounts[bank] = { incomes: 0, expenses: 0, movements: [] };
                     }

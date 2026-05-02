@@ -490,8 +490,8 @@ if (fixBankBtn) {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         // Si el campo banco no existe, es null o está vacío, lo marcamos para actualizar
-        if (!data.bank || data.bank.trim().toLowerCase() === "") { // Comparar en minúsculas
-          batch.update(docSnap.ref, { bank: "caixa" }); // Guardar en minúsculas
+        if (!data.bank || data.bank.trim().toUpperCase() === "") { 
+          batch.update(docSnap.ref, { bank: "CAIXA" }); 
           count++;
         }
       });

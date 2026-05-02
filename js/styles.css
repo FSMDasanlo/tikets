@@ -282,6 +282,11 @@ tfoot td {
     box-sizing: border-box;
 }
 
+/* Forzar visualización en mayúsculas para los campos de banco */
+#globalBank, #manualBank, #editBank, #filterBank, #addBank, #editIncomeBank {
+    text-transform: uppercase;
+}
+
 /* Colores para la cabecera según la Zona */
 .ticket-info.level-madrid {
     background-color: #e7f3ff; /* Azul claro */
