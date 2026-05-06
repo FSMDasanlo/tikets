@@ -281,7 +281,7 @@ async function saveDataToDb() {
             merchant: merchant,
             date: date,
             bank: bank.toUpperCase(), 
-            product: cells[0].innerText.toLowerCase(), // Normalizar a minúsculas
+            product: cells[0].innerText.trim(), 
             category: categorySelect.value.toLowerCase(), // Normalizar a minúsculas
             amount: amountVal, // Guardamos como número
             uid: currentUser.uid, // IMPORTANTE: Asociar al usuario
@@ -437,7 +437,7 @@ async function processFile(file) {
                 const priceMatch = line.match(priceRegex);
                 // Limpiamos espacios dentro del precio para que sea un número válido (ej: "12, 50" -> "12,50")
                 const price = priceMatch[0].replace(/\s/g, '');
-                const desc = line.replace(priceMatch[0], '').replace('€', '').trim().toLowerCase(); // Normalizar a minúsculas
+                const desc = line.replace(priceMatch[0], '').replace('€', '').trim(); 
                 
                 // Añadimos directamente a la tabla
                 addTableRow(desc, price);
@@ -698,7 +698,7 @@ saveManualDirectBtn.addEventListener('click', async () => {
     const merchant = manualMerchant.value.trim().toLowerCase(); // Normalizar a minúsculas
     const date = manualDate.value;
     const paymentDate = manualPaymentDate.value;
-    const product = manualProduct.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const product = manualProduct.value.trim(); 
     const category = manualCategory.value.toLowerCase(); // Normalizar a minúsculas
     const amount = parseFloat(manualAmount.value); // Ya es número
     const bank = manualBank.value.trim().toUpperCase(); 

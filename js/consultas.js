@@ -1167,7 +1167,7 @@ saveEditBtn.addEventListener('click', async () => {
         merchant: document.getElementById('editMerchant').value.trim().toLowerCase(), // Normalizar a minúsculas
         bank: document.getElementById('editBank').value.trim().toUpperCase(), 
         date: document.getElementById('editDate').value,
-        product: document.getElementById('editProduct').value.toLowerCase(), // Normalizar a minúsculas
+        product: document.getElementById('editProduct').value.trim(), 
         category: document.getElementById('editCategory').value.toLowerCase(), // Normalizar a minúsculas
         amount: parseFloat(document.getElementById('editAmount').value),
         paymentDate: document.getElementById('editPaymentDate').value || null // Guardar la fecha de pago

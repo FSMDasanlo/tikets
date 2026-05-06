@@ -195,7 +195,7 @@ if (btnAddIncome) {
 
     const date = addDate.value;
     const bank = addBank.value.trim().toUpperCase(); 
-    const concept = addConcept.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const concept = addConcept.value.trim(); 
     const amount = parseFloat(addAmount.value);
 
     if (!date || !bank || !concept || isNaN(amount)) {
@@ -441,7 +441,7 @@ if (saveIncomeEditBtn) {
     const id = editIncomeId.value;
     const date = editIncomeDate.value;
     const bank = editIncomeBank.value.trim().toUpperCase(); 
-    const concept = editIncomeConcept.value.trim().toLowerCase(); // Normalizar a minúsculas
+    const concept = editIncomeConcept.value.trim(); 
     const amount = parseFloat(editIncomeAmount.value);
 
     if (!date || !bank || !concept || isNaN(amount)) {
