@@ -850,7 +850,9 @@ function renderTable() {
                 updateActiveViewButton('btnViewDetail');
                 // Filtramos sobre los datos originales de la búsqueda para mostrar el detalle (por concepto)
                 currentFilteredDocs = originalFilteredDocs.filter(item => (item.product || 'sin concepto').toLowerCase() === prod); 
+                document.getElementById('filterProduct').value = prod;
                 renderTable();
+                renderChart();
             });
 
             resultsTableBody.appendChild(row);
@@ -902,6 +904,50 @@ function renderChart() {
 
     // Si estamos en modo evolución o cuentas, no ejecutar la lógica de tarta de gastos
     if (currentViewMode === 'evolution' || currentViewMode === 'accounts') return;
+
+    // --- NUEVO: Gráfica de barras si hay un producto seleccionado ---
+    const selectedProductFilter = document.getElementById('filterProduct').value;
+    if (selectedProductFilter) {
+        const monthlyTotals = {};
+        currentFilteredDocs.forEach(item => {
+            let d = item.date;
+            if (d && d.includes('/')) {
+                const [day, mon, yr] = d.split('/');
+                d = `${yr}-${mon.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            if (!d) return;
+            const month = d.substring(0, 7); // YYYY-MM
+            monthlyTotals[month] = (monthlyTotals[month] || 0) + (parseFloat(item.amount) || 0);
+        });
+
+        const sortedMonths = Object.keys(monthlyTotals).sort();
+
+        if (expenseChart) expenseChart.destroy();
+        expenseChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: sortedMonths,
+                datasets: [{
+                    label: 'Importe (€)',
+                    data: sortedMonths.map(m => monthlyTotals[m]),
+                    backgroundColor: '#007bff',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: `Evolución mensual: ${selectedProductFilter.toUpperCase()}` },
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+        return; // Detener ejecución para no pintar el gráfico circular
+    }
 
     // Comprobar si hay una categoría seleccionada en el filtro
     const selectedCategoryFilter = document.getElementById('filterCategory').value;
