@@ -152,6 +152,14 @@ const editIncomeAmount = document.getElementById("editIncomeAmount");
 const saveIncomeEditBtn = document.getElementById("saveIncomeEditBtn");
 const closeIncomeEditBtn = document.getElementById("closeIncomeEditBtn");
 
+// Elementos DOM - Traspaso
+const transferModal = document.getElementById("transferModal");
+const btnOpenTransfer = document.getElementById("btnOpenTransfer");
+const closeTransferBtn = document.getElementById("closeTransferBtn");
+const bankCardsContainer = document.getElementById("bankCardsContainer");
+const transferAmount = document.getElementById("transferAmount");
+const transferDate = document.getElementById("transferDate");
+
 // Autenticación
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -400,6 +408,163 @@ async function deleteIncome(id) {
     }
   }
 }
+
+// --- FUNCIONALIDAD TRASPASO ---
+
+if (btnOpenTransfer) {
+  btnOpenTransfer.addEventListener("click", () => {
+    // Inicializar fecha
+    transferDate.value = new Date().toISOString().split("T")[0];
+    transferAmount.value = "";
+    
+    // Obtener lista única de bancos activos
+    const banks = [...new Set(currentIncomesData.map(i => i.bank))].sort();
+    
+    renderBankCards(banks);
+    
+    transferModal.style.display = "flex";
+    setTimeout(() => transferModal.classList.add("show"), 10);
+  });
+}
+
+if (closeTransferBtn) {
+  closeTransferBtn.addEventListener("click", () => {
+    transferModal.classList.remove("show");
+    setTimeout(() => transferModal.style.display = "none", 300);
+  });
+}
+
+function renderBankCards(banks) {
+  bankCardsContainer.innerHTML = "";
+  
+  if (banks.length === 0) {
+    bankCardsContainer.innerHTML = `
+      <div style="grid-column: 1/-1; padding: 40px; text-align: center; color: #888;">
+        No hay bancos registrados todavía en tus ingresos.
+      </div>`;
+    return;
+  }
+  
+  banks.forEach(bank => {
+    const card = document.createElement("div");
+    card.className = "bank-card";
+    card.draggable = true;
+    card.dataset.bank = bank;
+    card.innerHTML = `
+      <i class="fa-solid fa-building-columns"></i>
+      <span>${bank}</span>
+    `;
+    
+    // DRAG EVENTS
+    card.addEventListener("dragstart", handleDragStart);
+    card.addEventListener("dragend", handleDragEnd);
+    
+    // DROP EVENTS
+    card.addEventListener("dragover", handleDragOver);
+    card.addEventListener("dragleave", handleDragLeave);
+    card.addEventListener("drop", handleDrop);
+    
+    bankCardsContainer.appendChild(card);
+  });
+}
+
+let draggedBankElement = null;
+
+function handleDragStart(e) {
+  draggedBankElement = this;
+  this.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", this.dataset.bank);
+}
+
+function handleDragEnd() {
+  this.classList.remove("dragging");
+  draggedBankElement = null;
+  // Limpiar clases de todos
+  document.querySelectorAll(".bank-card").forEach(c => {
+    c.classList.remove("dragging");
+    c.classList.remove("drag-over");
+  });
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  if (this !== draggedBankElement) {
+    this.classList.add("drag-over");
+  }
+  e.dataTransfer.dropEffect = "move";
+  return false;
+}
+
+function handleDragLeave() {
+  this.classList.remove("drag-over");
+}
+
+async function handleDrop(e) {
+  e.stopPropagation();
+  this.classList.remove("drag-over");
+  
+  const originBank = e.dataTransfer.getData("text/plain");
+  const destBank = this.dataset.bank;
+  const amount = parseFloat(transferAmount.value);
+  const date = transferDate.value;
+  
+  if (originBank === destBank) {
+      showCustomAlert("⚠️ El banco de origen y destino no pueden ser el mismo.", "error");
+      return;
+  }
+  
+  if (!amount || amount <= 0) {
+      showCustomAlert("⚠️ Indica un importe válido para el traspaso.", "error");
+      transferAmount.focus();
+      return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    `¿Confirmar traspaso de <b>${formatCurrency(amount)}</b>?<br><br>` +
+    `Desde: <b>${originBank}</b><br>` +
+    `Hacia: <b>${destBank}</b>`
+  );
+
+  if (confirmed) {
+    try {
+      // 1. Apunte Negativo (Origen)
+      await addDoc(collection(db, "incomes"), {
+        uid: currentUser.uid,
+        date: date,
+        bank: originBank,
+        concept: `traspaso a ${destBank}`.toLowerCase(),
+        amount: -amount,
+        createdAt: new Date(),
+      });
+
+      // 2. Apunte Positivo (Destino)
+      await addDoc(collection(db, "incomes"), {
+        uid: currentUser.uid,
+        date: date,
+        bank: destBank,
+        concept: `traspaso desde ${originBank}`.toLowerCase(),
+        amount: amount,
+        createdAt: new Date(),
+      });
+
+      this.classList.add("drop-success");
+      showCustomAlert("✅ Traspaso realizado correctamente.", "success");
+      
+      setTimeout(() => {
+        transferModal.classList.remove("show");
+        setTimeout(() => transferModal.style.display = "none", 300);
+        searchIncomes();
+        if (typeof loadIncomeSuggestions === "function") loadIncomeSuggestions();
+      }, 1000);
+
+    } catch (error) {
+      console.error("Error en traspaso:", error);
+      showCustomAlert("❌ Error al realizar el traspaso.", "error");
+    }
+  }
+}
+
 
 // --- FUNCIÓN: ABRIR MODAL EDICIÓN ---
 function openEditModal(id) {
