@@ -166,6 +166,11 @@ const closeEditBtn = document.getElementById('closeEditBtn');
 const saveEditBtn = document.getElementById('saveEditBtn');
 const editModalTitle = document.getElementById('editModalTitle');
 
+// Al cambiar la fecha del gasto, actualizar por defecto la fecha de pago (99% de los casos coincide)
+document.getElementById('editDate').addEventListener('change', (e) => {
+    document.getElementById('editPaymentDate').value = e.target.value;
+});
+
 // Evento de ordenación en cabeceras
 if (resultsTableHead) {
     resultsTableHead.addEventListener('click', (e) => {

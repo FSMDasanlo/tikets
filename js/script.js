@@ -247,6 +247,14 @@ globalLevel0Input.addEventListener('change', () => {
     ticketInfoDiv.classList.add(`level-${selectedLevel}`);
 });
 
+// Al cambiar la fecha de compra global, actualizar por defecto todas las fechas de pago de las filas
+globalDateInput.addEventListener('change', (e) => {
+    const newDate = e.target.value;
+    document.querySelectorAll('.row-payment-date').forEach(input => {
+        input.value = newDate;
+    });
+});
+
 // Función para guardar datos (Simulación BD)
 async function saveDataToDb() {
     const rows = document.querySelectorAll('#ticketsTable tbody tr');
