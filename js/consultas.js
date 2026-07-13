@@ -475,6 +475,60 @@ function clearFilters() {
     updateStats();
 }
 
+// Función para calcular y mostrar el saldo actual de un banco (Ingresos - Gastos históricos)
+async function updateBankBalance() {
+    const bankSelect = document.getElementById('filterBank');
+    const balanceDisplay = document.getElementById('bankBalanceDisplay');
+    if (!balanceDisplay || !bankSelect) return;
+
+    const bank = bankSelect.value.toUpperCase();
+    if (!bank) {
+        balanceDisplay.style.display = 'none';
+        return;
+    }
+
+    balanceDisplay.textContent = '...';
+    balanceDisplay.style.display = 'inline-block';
+    balanceDisplay.style.color = '#555';
+    balanceDisplay.style.borderColor = '#ddd';
+
+    try {
+        const [incomeSnap, expenseSnap] = await Promise.all([
+            getDocs(query(collection(db, "incomes"), where("uid", "==", currentUser.uid))),
+            getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid)))
+        ]);
+
+        let totalIncome = 0;
+        incomeSnap.forEach(d => {
+            if ((d.data().bank || '').toUpperCase() === bank) {
+                totalIncome += parseFloat(d.data().amount) || 0;
+            }
+        });
+
+        let totalExpense = 0;
+        expenseSnap.forEach(d => {
+            if ((d.data().bank || '').toUpperCase() === bank) {
+                totalExpense += parseFloat(d.data().amount) || 0;
+            }
+        });
+
+        const balance = totalIncome - totalExpense;
+        balanceDisplay.textContent = formatCurrency(balance);
+        if (balance >= 0) {
+            balanceDisplay.style.color = '#28a745';
+            balanceDisplay.style.borderColor = '#28a745';
+            balanceDisplay.style.background = '#f0fff4';
+        } else {
+            balanceDisplay.style.color = '#dc3545';
+            balanceDisplay.style.borderColor = '#dc3545';
+            balanceDisplay.style.background = '#fff5f5';
+        }
+    } catch (err) {
+        console.error("Error calculando saldo del banco:", err);
+        balanceDisplay.style.display = 'none';
+    }
+}
+
 // Función para renderizar la tabla (separada de la búsqueda)
 function renderTable() {
     resultsTableBody.innerHTML = '';
@@ -1198,6 +1252,7 @@ saveEditBtn.addEventListener('click', async () => {
         
         editModalOverlay.style.display = 'none';
         searchExpenses(); // Recargar tabla
+        updateBankBalance(); // Recalcular saldo del banco seleccionado
     } catch (error) {
         console.error("Error al guardar:", error);
         showCustomAlert("Error al guardar: " + error.message, "error");
@@ -1239,6 +1294,12 @@ if(searchBtn) {
 
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
+    }
+
+    // Actualizar saldo del banco al cambiar el desplegable
+    const filterBankSelect = document.getElementById('filterBank');
+    if (filterBankSelect) {
+        filterBankSelect.addEventListener('change', updateBankBalance);
     }
 
     if (btnPrevMonth) {

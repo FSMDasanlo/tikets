@@ -42,9 +42,15 @@
                 </div>
                 <div class="filter-group">
                     <label>Banco</label>
-                    <select id="filterBank">
-                        <option value="">Cargando...</option>
-                    </select>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <select id="filterBank" style="flex: 1; min-width: 0; width: auto;">
+                            <option value="">Cargando...</option>
+                        </select>
+                        <span id="bankBalanceDisplay" title="Saldo actual del banco (Ingresos - Gastos históricos)"
+                              style="display: none; font-size: 0.82rem; font-weight: bold; white-space: nowrap;
+                                     padding: 4px 7px; border-radius: 5px; border: 1px solid #ddd;
+                                     background: #f8f9fa; min-width: 78px; text-align: center;"></span>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>Comercio</label>
