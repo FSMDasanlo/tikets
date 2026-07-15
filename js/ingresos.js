@@ -138,8 +138,38 @@ const btnClear = document.getElementById("btnClear");
 const incomeTableBody = document.querySelector("#incomeTable tbody");
 const totalIncomeSpan = document.getElementById("totalIncome");
 const incomeTableHead = document.querySelector("#incomeTable thead");
+const btnViewDetail = document.getElementById("btnViewDetail");
+const btnViewByConcept = document.getElementById("btnViewByConcept");
+
 let sortState = { column: "date", direction: "desc" }; // Estado de ordenación
 let lastFilteredIncomes = []; // Almacenamos el resultado filtrado para re-ordenar sin consultar
+let currentViewMode = "detail"; // 'detail' o 'concept'
+
+// Función para gestionar visualmente el botón de vista activo
+function updateActiveViewButton(activeId) {
+  [btnViewDetail, btnViewByConcept].forEach(btn => {
+    if (btn) {
+      if (btn.id === activeId) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+}
+
+if (btnViewDetail) {
+  btnViewDetail.addEventListener('click', () => {
+    currentViewMode = 'detail';
+    updateActiveViewButton('btnViewDetail');
+    renderTable(lastFilteredIncomes);
+  });
+}
+
+if (btnViewByConcept) {
+  btnViewByConcept.addEventListener('click', () => {
+    currentViewMode = 'concept';
+    updateActiveViewButton('btnViewByConcept');
+    renderTable(lastFilteredIncomes);
+  });
+}
 
 // Elementos DOM - Modal Edición
 const editIncomeModal = document.getElementById("editIncomeModal");
@@ -285,13 +315,13 @@ async function searchIncomes() {
     const fDateStart = filterDateStart ? filterDateStart.value : "";
     const fDateEnd = filterDateEnd ? filterDateEnd.value : "";
     const fBank = filterBank ? filterBank.value.toUpperCase().trim() : ""; 
-    const fConcept = filterConcept ? filterConcept.value.toLowerCase().trim() : ""; // Ya está en minúsculas
+    const fConcept = filterConcept ? filterConcept.value.toLowerCase().trim() : "";
 
     const filteredIncomes = incomes.filter((item) => {
       if (fDateStart && item.date < fDateStart) return false;
       if (fDateEnd && item.date > fDateEnd) return false;
       if (fBank && !item.bank.toUpperCase().includes(fBank)) return false; 
-      if (fConcept && !item.concept.includes(fConcept)) return false; // item.concept ya está en minúsculas
+      if (fConcept && !(item.concept || "").toLowerCase().includes(fConcept)) return false; 
       return true;
     });
 
@@ -307,11 +337,31 @@ function renderTable(data) {
   incomeTableBody.innerHTML = "";
   let total = 0;
 
+  // --- ACTUALIZAR CABECERAS SEGÚN MODO ---
+  if (currentViewMode === "detail") {
+    incomeTableHead.innerHTML = `
+      <tr>
+          <th data-sort="date" style="cursor: pointer;">Fecha</th>
+          <th data-sort="bank" style="cursor: pointer;">Banco</th>
+          <th data-sort="concept" style="cursor: pointer;">Concepto</th>
+          <th data-sort="amount" style="text-align: right; cursor: pointer;">Importe</th>
+          <th style="text-align: center;">Acciones</th>
+      </tr>
+    `;
+  } else {
+    incomeTableHead.innerHTML = `
+      <tr>
+          <th data-sort="concept" style="cursor: pointer;">Concepto</th>
+          <th data-sort="amount" style="text-align: right; cursor: pointer;">Importe Total</th>
+          <th></th>
+      </tr>
+    `;
+  }
+
   // --- ACTUALIZAR INDICADORES VISUALES DE ORDENACIÓN ---
   const headers = incomeTableHead.querySelectorAll('th[data-sort]');
   headers.forEach(th => {
     const column = th.dataset.sort;
-    // Limpiar iconos previos (si existen)
     let text = th.textContent.replace(/[▲▼]/g, '').trim();
     if (column === sortState.column) {
       th.textContent = text + (sortState.direction === 'asc' ? ' ▲' : ' ▼');
@@ -320,75 +370,119 @@ function renderTable(data) {
     }
   });
 
-  // --- LÓGICA DE ORDENACIÓN ---
-  data.sort((a, b) => {
-    let valA = a[sortState.column];
-    let valB = b[sortState.column];
-
-    if (sortState.column === "amount") {
-      valA = parseFloat(valA) || 0;
-      valB = parseFloat(valB) || 0;
-    } else {
-      valA = (valA || "").toString().toLowerCase();
-      valB = (valB || "").toString().toLowerCase();
-    }
-
-    if (valA < valB) return sortState.direction === "asc" ? -1 : 1;
-    if (valA > valB) return sortState.direction === "asc" ? 1 : -1;
-    return 0;
-  });
-
   if (data.length === 0) {
     incomeTableBody.innerHTML =
-      '<tr><td colspan="5" style="text-align:center; color: #777;">No se encontraron ingresos.</td></tr>';
+      `<tr><td colspan="${currentViewMode === 'detail' ? 5 : 3}" style="text-align:center; color: #777;">No se encontraron ingresos.</td></tr>`;
     totalIncomeSpan.textContent = "Total: 0.00 €";
     return;
   }
 
-  data.forEach((item) => {
-    const amount = parseFloat(item.amount) || 0;
-    total += amount;
+  // --- MODO DETALLE ---
+  if (currentViewMode === "detail") {
+    // Lógica de Ordenación
+    data.sort((a, b) => {
+      let valA = a[sortState.column];
+      let valB = b[sortState.column];
 
-    // Formatear fecha DD-MM-YYYY
-    let displayDate = item.date;
-    if (displayDate && displayDate.includes("-")) {
-      const [y, m, d] = displayDate.split("-");
-      displayDate = `${d}-${m}-${y}`;
-    }
+      if (sortState.column === "amount") {
+        valA = parseFloat(valA) || 0;
+        valB = parseFloat(valB) || 0;
+      } else {
+        valA = (valA || "").toString().toLowerCase();
+        valB = (valB || "").toString().toLowerCase();
+      }
 
-    const row = document.createElement("tr");
-    row.innerHTML = `
-            <td data-label="Fecha">${displayDate}</td>
-            <td data-label="Banco">${item.bank}</td> 
-            <td data-label="Concepto">${item.concept}</td> <!-- Se muestra como está guardado (minúsculas) -->
-            <td data-label="Importe" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
-            <td data-label="Acciones" style="text-align: center;">
-                <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;" title="Duplicar">📄</button>
-                <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" title="Editar">✏️</button>
-                <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Borrar">🗑️</button>
-            </td>
-        `;
-    incomeTableBody.appendChild(row);
-  });
+      if (valA < valB) return sortState.direction === "asc" ? -1 : 1;
+      if (valA > valB) return sortState.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    data.forEach((item) => {
+      const amount = parseFloat(item.amount) || 0;
+      total += amount;
+
+      let displayDate = item.date;
+      if (displayDate && displayDate.includes("-")) {
+        const [y, m, d] = displayDate.split("-");
+        displayDate = `${d}-${m}-${y}`;
+      }
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+              <td data-label="Fecha">${displayDate}</td>
+              <td data-label="Banco">${item.bank}</td> 
+              <td data-label="Concepto">${item.concept}</td>
+              <td data-label="Importe" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
+              <td data-label="Acciones" style="text-align: center;">
+                  <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;" title="Duplicar">📄</button>
+                  <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" title="Editar">✏️</button>
+                  <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Borrar">🗑️</button>
+              </td>
+          `;
+      incomeTableBody.appendChild(row);
+    });
+  } 
+  // --- MODO AGRUPADO POR CONCEPTO ---
+  else if (currentViewMode === "concept") {
+    const groups = {};
+    data.forEach(item => {
+      const conceptKey = (item.concept || 'sin concepto').toLowerCase().trim();
+      if (!groups[conceptKey]) {
+        groups[conceptKey] = {
+          displayConcept: item.concept, // Guardamos la primera forma de escribirlo
+          amount: 0
+        };
+      }
+      groups[conceptKey].amount += parseFloat(item.amount) || 0;
+      total += parseFloat(item.amount) || 0;
+    });
+
+    // Convertir a array y ordenar
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+      let valA, valB;
+      if (sortState.column === "amount") {
+        valA = a.amount;
+        valB = b.amount;
+      } else {
+        valA = a.displayConcept.toLowerCase();
+        valB = b.displayConcept.toLowerCase();
+      }
+      if (valA < valB) return sortState.direction === "asc" ? -1 : 1;
+      if (valA > valB) return sortState.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    sortedGroups.forEach(group => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td data-label="Concepto" style="font-weight: bold;">${group.displayConcept}</td>
+        <td data-label="Total" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(group.amount)}</td>
+        <td></td>
+      `;
+      incomeTableBody.appendChild(row);
+    });
+  }
 
   totalIncomeSpan.textContent = `Total: ${formatCurrency(total)}`;
 
-  // Eventos de botones
-  document.querySelectorAll(".btn-delete").forEach((btn) => {
-    btn.addEventListener("click", (e) =>
-      deleteIncome(e.target.closest("button").dataset.id),
-    );
-  });
-  document.querySelectorAll(".btn-edit").forEach((btn) => {
-    btn.addEventListener("click", (e) =>
-      openEditModal(e.target.closest("button").dataset.id),
-    );
-  });
-  document.querySelectorAll(".btn-duplicate").forEach((btn) => {
-    btn.addEventListener("click", (e) =>
-      openDuplicateModal(e.target.closest("button").dataset.id),
-    );
-  });
+  // Eventos de botones (solo en modo detalle)
+  if (currentViewMode === "detail") {
+    document.querySelectorAll(".btn-delete").forEach((btn) => {
+      btn.addEventListener("click", (e) =>
+        deleteIncome(e.target.closest("button").dataset.id),
+      );
+    });
+    document.querySelectorAll(".btn-edit").forEach((btn) => {
+      btn.addEventListener("click", (e) =>
+        openEditModal(e.target.closest("button").dataset.id),
+      );
+    });
+    document.querySelectorAll(".btn-duplicate").forEach((btn) => {
+      btn.addEventListener("click", (e) =>
+        openDuplicateModal(e.target.closest("button").dataset.id),
+      );
+    });
+  }
 }
 
 // --- FUNCIÓN 3: BORRAR INGRESO ---
