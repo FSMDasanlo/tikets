@@ -135,6 +135,7 @@ const btnViewAccounts = document.getElementById('btnViewAccounts');
 const btnViewEvolution = document.getElementById('btnViewEvolution');
 const btnViewByCategory = document.getElementById('btnViewByCategory');
 const btnViewByConcept = document.getElementById('btnViewByConcept');
+const btnViewMovements = document.getElementById('btnViewMovements'); // Nuevo botón Movimientos
 const btnExportPDF = document.getElementById('btnExportPDF');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
@@ -150,7 +151,7 @@ let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
 
 // Función para gestionar visualmente el botón de vista activo
 function updateActiveViewButton(activeId) {
-    const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution', 'btnViewByCategory', 'btnViewByConcept'];
+    const viewButtons = ['btnViewTotal', 'btnViewDetail', 'btnViewAccounts', 'btnViewEvolution', 'btnViewByCategory', 'btnViewByConcept', 'btnViewMovements'];
     viewButtons.forEach(id => {
         const btn = document.getElementById(id);
         if (btn) {
@@ -301,6 +302,7 @@ async function loadConfig() {
         // Rellenar Categorías
         if (!catsSnap.empty) {
             filterCat.innerHTML = '<option value="">Todas</option>';
+            filterCat.innerHTML += '<option value="ingreso">Ingresos</option>'; 
             editCat.innerHTML = '';
             
             catsSnap.forEach(doc => { // Las categorías se guardan en minúsculas
@@ -352,10 +354,29 @@ async function searchExpenses() {
             incomeSnap.forEach(doc => {
                 const data = doc.data();
                 let d = data.date;
+                
+                // --- FILTRADO DE INGRESOS ---
+                // 1. Filtro Fecha
                 if (dateStart && d < dateStart) return;
                 if (dateEnd && d > dateEnd) return;
+                
+                // 2. Filtro Banco
+                if (bank && (data.bank || "").toUpperCase() !== bank) return;
+
+                // 3. Filtro Concepto (se busca en el campo 'concept' de ingresos)
+                if (product && !(data.concept || "").toLowerCase().includes(product)) return;
+
+                // 4. Filtro Comercio (Los ingresos no tienen comercio)
+                if (merchant) return;
+
+                // 5. Filtro Zona (Los ingresos no suelen tener zona, pero si hay filtro activo y no coincide, se excluyen)
+                if (level0) return; // Si hay filtro de zona, los ingresos no aparecen (o podrias permitirlo si quieres)
+
+                // 5. Filtro Categoría (Los ingresos son "Ingreso", si hay filtro de categoría y no es "ingreso", se excluye)
+                if (category && category !== 'ingreso') return;
+
                 incomeTotal += parseFloat(data.amount) || 0;
-                allIncomes.push({ id: doc.id, ...doc.data() });
+                allIncomes.push({ id: doc.id, ...data, isIncome: true });
             });
             currentTotalIncome = incomeTotal;
             currentFilteredIncomes = allIncomes;
@@ -797,6 +818,94 @@ function renderTable() {
             resultsTableBody.appendChild(detailRow);
         });
     }
+    // --- MODO MOVIMIENTOS ---
+    else if (currentViewMode === 'movements') {
+        // Combinar gastos e ingresos
+        let movements = [
+            ...currentFilteredDocs.map(d => ({ ...d, type: 'Gasto', normalizedAmount: -(parseFloat(d.amount) || 0) })),
+            ...currentFilteredIncomes.map(i => ({ ...i, type: 'Ingreso', product: i.concept, category: 'Ingreso', merchant: '-', normalizedAmount: (parseFloat(i.amount) || 0) }))
+        ];
+
+        // Ordenar datos
+        movements.sort((a, b) => {
+            let valA = a[sortState.column];
+            let valB = b[sortState.column];
+            
+            if (sortState.column === 'amount') {
+                valA = a.normalizedAmount;
+                valB = b.normalizedAmount;
+            } else if (sortState.column === 'type_concept') {
+                valA = (a.type === 'Ingreso' ? a.product : `${a.merchant} - ${a.product}`).toLowerCase();
+                valB = (b.type === 'Ingreso' ? b.product : `${b.merchant} - ${b.product}`).toLowerCase();
+            } else {
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+            
+            if (valA < valB) return sortState.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortState.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Helper para iconos de ordenación
+        const getSortIcon = (col) => {
+            if (sortState.column !== col) return '';
+            return sortState.direction === 'asc' ? ' ▲' : ' ▼';
+        };
+
+        resultsTableHead.innerHTML = `
+            <tr>
+                <th data-sort="date" style="cursor: pointer; width: 95px;">Fecha${getSortIcon('date')}</th>
+                <th data-sort="type" style="cursor: pointer;">Tipo${getSortIcon('type')}</th>
+                <th data-sort="bank" style="cursor: pointer;">Banco${getSortIcon('bank')}</th>
+                <th data-sort="type_concept" style="cursor: pointer;">Comercio / Concepto${getSortIcon('type_concept')}</th>
+                <th data-sort="category" style="cursor: pointer;">Categoría${getSortIcon('category')}</th>
+                <th data-sort="amount" style="cursor: pointer; text-align: right;">Importe${getSortIcon('amount')}</th>
+                <th style="width: 50px;"></th>
+            </tr>
+        `;
+
+        movements.forEach(move => {
+            const row = document.createElement('tr');
+            const amt = parseFloat(move.amount) || 0;
+            const isInc = move.type === 'Ingreso';
+            
+            if (isInc) {
+                row.style.backgroundColor = '#f0fff4'; 
+            }
+
+            let displayDate = move.date;
+            if (displayDate && displayDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [y, m, d] = displayDate.split('-');
+                displayDate = `${d}/${m}/${y.slice(-2)}`;
+            }
+
+            const conceptText = isInc ? move.product : `${move.merchant} - ${move.product}`;
+
+            row.innerHTML = `
+                <td>${displayDate}</td>
+                <td style="font-weight: bold; color: ${isInc ? '#28a745' : '#dc3545'}">${move.type}</td>
+                <td>${move.bank || '-'}</td>
+                <td>${conceptText}</td>
+                <td>${move.category || '-'}</td>
+                <td style="text-align: right; font-weight: bold; color: ${isInc ? '#28a745' : '#dc3545'}">
+                    ${isInc ? '+' : '-'}${formatCurrency(amt)}
+                </td>
+                <td></td>
+            `;
+            resultsTableBody.appendChild(row);
+        });
+
+        // En este modo no calculamos totalAmount sumando todo porque se mezcla.
+        // Pero el pie de página mostrará el balance neto si lo calculamos aquí.
+        let netBalance = 0;
+        movements.forEach(m => {
+            const a = parseFloat(m.amount) || 0;
+            if (m.type === 'Ingreso') netBalance += a;
+            else netBalance -= a;
+        });
+        totalAmount = netBalance;
+    }
     // --- MODO AGRUPADO POR CATEGORÍA ---
     else if (currentViewMode === 'category') {
         resultsTableHead.innerHTML = `
@@ -921,24 +1030,39 @@ function renderTable() {
     // --- RENDERIZAR PIE DE TABLA (TOTAL GLOBAL) ---
     if (resultsTableFoot && currentViewMode !== 'evolution' && currentViewMode !== 'accounts') { // No mostrar en evolución o cuentas
         // Ajustar colspan: Las vistas agrupadas tienen menos columnas que el detalle
-        const colspan = (currentViewMode === 'category' || currentViewMode === 'concept') ? 1 : 6;
+        let colspan = 6;
+        if (currentViewMode === 'category' || currentViewMode === 'concept') colspan = 1;
+        else if (currentViewMode === 'movements') colspan = 5;
+
+        const totalLabel = currentViewMode === 'movements' ? 'BALANCE NETO:' : 'TOTAL GLOBAL:';
+        const totalColor = (currentViewMode === 'movements' && totalAmount < 0) ? '#dc3545' : 
+                          (currentViewMode === 'movements' && totalAmount > 0) ? '#28a745' : '#007bff';
+
         resultsTableFoot.innerHTML = `
             <tr style="background-color: #e9ecef; border-top: 2px solid #dee2e6;">
-                <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">TOTAL GLOBAL:</td>
-                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: #007bff; white-space: nowrap;">${formatCurrency(totalAmount)}</td>
+                <td colspan="${colspan}" style="text-align: right; font-weight: bold; padding: 12px;">${totalLabel}</td>
+                <td style="text-align: right; font-weight: bold; font-size: 1.1em; padding: 12px; color: ${totalColor}; white-space: nowrap;">${formatCurrency(totalAmount)}</td>
                 <td></td>
             </tr>
         `;
     }
 
+    if (currentViewMode === 'movements') {
+        totalResultsSpan.textContent = `Balance: ${formatCurrency(totalAmount)}`;
+        if (totalBalanceSpan) totalBalanceSpan.style.display = 'none';
+        if (totalIncomesSpan) totalIncomesSpan.style.display = 'none';
+    } else {
         totalResultsSpan.textContent = `Gastos: ${formatCurrency(totalAmount)}`;
+        if (totalBalanceSpan) totalBalanceSpan.style.display = 'inline';
+        if (totalIncomesSpan) totalIncomesSpan.style.display = 'inline';
+    }
 
-        // Actualizar Balance
-        if (totalBalanceSpan) {
-            const balance = currentTotalIncome - totalAmount;
-            totalBalanceSpan.textContent = `Balance: ${formatCurrency(balance)}`;
-            totalBalanceSpan.style.color = balance >= 0 ? '#28a745' : '#dc3545';
-        }
+    // Actualizar Balance (solo si no es movimientos)
+    if (totalBalanceSpan && currentViewMode !== 'movements') {
+        const balance = currentTotalIncome - totalAmount;
+        totalBalanceSpan.textContent = `Balance: ${formatCurrency(balance)}`;
+        totalBalanceSpan.style.color = balance >= 0 ? '#28a745' : '#dc3545';
+    }
 
         // Añadir eventos a los botones generados
         document.querySelectorAll('.btn-delete').forEach(btn => {
@@ -1380,6 +1504,18 @@ if(searchBtn) {
         currentViewMode = 'concept';
         drillDownViewMode = 'concept';
         updateActiveViewButton('btnViewByConcept');
+        if (originalFilteredDocs.length === 0) {
+            searchExpenses();
+        } else {
+            currentFilteredDocs = [...originalFilteredDocs];
+            renderTable();
+        }
+    });
+
+    btnViewMovements.addEventListener('click', () => {
+        currentViewMode = 'movements';
+        drillDownViewMode = 'movements';
+        updateActiveViewButton('btnViewMovements');
         if (originalFilteredDocs.length === 0) {
             searchExpenses();
         } else {
