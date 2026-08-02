@@ -314,14 +314,14 @@ async function searchIncomes() {
     // Aplicar Filtros
     const fDateStart = filterDateStart ? filterDateStart.value : "";
     const fDateEnd = filterDateEnd ? filterDateEnd.value : "";
-    const fBank = filterBank ? filterBank.value.toUpperCase().trim() : ""; 
+    const fBank = filterBank ? filterBank.value.trim().toUpperCase() : "";
     const fConcept = filterConcept ? filterConcept.value.toLowerCase().trim() : "";
 
     const filteredIncomes = incomes.filter((item) => {
       if (fDateStart && item.date < fDateStart) return false;
       if (fDateEnd && item.date > fDateEnd) return false;
-      if (fBank && !item.bank.toUpperCase().includes(fBank)) return false; 
-      if (fConcept && !(item.concept || "").toLowerCase().includes(fConcept)) return false; 
+      if (fBank && (item.bank || "").trim().toUpperCase() !== fBank) return false;
+      if (fConcept && !(item.concept || "").toLowerCase().includes(fConcept)) return false;
       return true;
     });
 
@@ -751,9 +751,10 @@ async function loadIncomeSuggestions() {
   if (!currentUser) return;
   const bankDatalist = document.getElementById("bankSuggestions");
   const conceptDatalist = document.getElementById("conceptSuggestions");
+  const filterBankSelect = document.getElementById("filterBank");
 
   // Si no existen los datalists en el DOM, salimos
-  if (!bankDatalist || !conceptDatalist) return;
+  if (!bankDatalist || !conceptDatalist || !filterBankSelect) return;
 
   try {
     const q = query(
@@ -769,6 +770,20 @@ async function loadIncomeSuggestions() {
       if (data.bank) banks.add(data.bank.trim().toUpperCase()); 
       if (data.concept) concepts.add(data.concept.trim().toLowerCase()); // Normalizar a minúsculas
     });
+
+    const selectedBank = filterBankSelect.value;
+
+    // Rellenar desplegable de bancos para el filtro de consultas
+    filterBankSelect.innerHTML = '<option value="">Todos los bancos</option>';
+    Array.from(banks)
+      .sort()
+      .forEach((bank) => {
+        const option = document.createElement("option");
+        option.value = bank;
+        option.textContent = bank;
+        filterBankSelect.appendChild(option);
+      });
+    filterBankSelect.value = selectedBank;
 
     // Rellenar Datalist Bancos
     bankDatalist.innerHTML = "";
