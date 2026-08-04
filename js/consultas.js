@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy, doc, deleteDoc, updateDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 // --- CONFIGURACIÓN DE FIREBASE (Copiada de script.js) ---
@@ -137,6 +137,16 @@ const btnViewByCategory = document.getElementById('btnViewByCategory');
 const btnViewByConcept = document.getElementById('btnViewByConcept');
 const btnViewMovements = document.getElementById('btnViewMovements'); // Nuevo botón Movimientos
 const btnExportPDF = document.getElementById('btnExportPDF');
+const btnImportExcel = document.getElementById('btnImportExcel');
+const excelFileInput = document.getElementById('excelFileInput');
+const importPreviewCard = document.getElementById('importPreviewCard');
+const importSummaryText = document.getElementById('importSummaryText');
+const importDefaultLevel = document.getElementById('importDefaultLevel');
+const importDefaultCategory = document.getElementById('importDefaultCategory');
+const importRowsContainer = document.getElementById('importRowsContainer');
+const btnAddImportRow = document.getElementById('btnAddImportRow');
+const btnCancelImport = document.getElementById('btnCancelImport');
+const btnCommitImport = document.getElementById('btnCommitImport');
 
 let currentFilteredDocs = []; // Almacena los datos actuales para no re-consultar al cambiar vista
 let originalFilteredDocs = []; // Copia de seguridad de los resultados de búsqueda para filtros locales (gráfico)
@@ -148,6 +158,267 @@ let currentDateFilterType = 'incurredDate'; // 'incurredDate' o 'paymentDate'
 let expenseChart = null; // Variable para el gráfico
 let categoryColors = {}; // Mapa de colores por categoría
 let sortState = { column: 'date', direction: 'desc' }; // Estado de ordenación
+let importPreviewRows = []; // Filas parseadas del Excel para edición previa
+
+function normalizeImportText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function toIsoDateFromDateObj(dateObj) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function parseImportDate(rawDate) {
+    if (rawDate instanceof Date && !isNaN(rawDate)) {
+        return toIsoDateFromDateObj(rawDate);
+    }
+
+    if (typeof rawDate === 'number' && Number.isFinite(rawDate)) {
+        const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+        const parsed = new Date(excelEpoch.getTime() + Math.round(rawDate * 86400000));
+        if (!isNaN(parsed)) {
+            const y = parsed.getUTCFullYear();
+            const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getUTCDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+    }
+
+    const txt = String(rawDate || '').trim();
+    if (!txt) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) return txt;
+
+    const slash = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (slash) {
+        const day = slash[1].padStart(2, '0');
+        const month = slash[2].padStart(2, '0');
+        const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    const parsed = new Date(txt);
+    return isNaN(parsed) ? '' : toIsoDateFromDateObj(parsed);
+}
+
+function parseImportAmount(rawAmount) {
+    if (typeof rawAmount === 'number') {
+        return Number.isFinite(rawAmount) ? rawAmount : NaN;
+    }
+
+    let txt = String(rawAmount || '').trim();
+    if (!txt) return NaN;
+
+    txt = txt.replace(/€/g, '').replace(/\s/g, '');
+    if (txt.includes('.') && txt.includes(',')) {
+        txt = txt.replace(/\./g, '').replace(',', '.');
+    } else if (txt.includes(',')) {
+        txt = txt.replace(',', '.');
+    }
+
+    const parsed = parseFloat(txt);
+    return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function getImportLevelDefault() {
+    const filterLevel = document.getElementById('filterLevel0');
+    if (filterLevel && filterLevel.value) return filterLevel.value;
+    if (filterLevel) {
+        const firstValid = Array.from(filterLevel.options).find(opt => opt.value);
+        if (firstValid) return firstValid.value;
+    }
+    return 'MADRID';
+}
+
+function getImportCategoryDefault() {
+    const filterCat = document.getElementById('filterCategory');
+    if (filterCat && filterCat.value && filterCat.value.toLowerCase() !== 'ingreso') return filterCat.value.toLowerCase();
+    if (filterCat) {
+        const firstValid = Array.from(filterCat.options).find(opt => opt.value && opt.value.toLowerCase() !== 'ingreso');
+        if (firstValid) return firstValid.value.toLowerCase();
+    }
+    return 'sin categoria';
+}
+
+function syncImportDefaultsFromFilters() {
+    if (!importDefaultLevel || !importDefaultCategory) return;
+
+    const filterLevel = document.getElementById('filterLevel0');
+    const filterCategory = document.getElementById('filterCategory');
+
+    importDefaultLevel.innerHTML = '';
+    if (filterLevel) {
+        Array.from(filterLevel.options).forEach(opt => {
+            if (!opt.value) return;
+            importDefaultLevel.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
+        });
+    }
+
+    if (!importDefaultLevel.options.length) {
+        importDefaultLevel.innerHTML = '<option value="MADRID">MADRID</option>';
+    }
+    importDefaultLevel.value = getImportLevelDefault();
+
+    importDefaultCategory.innerHTML = '';
+    if (filterCategory) {
+        Array.from(filterCategory.options).forEach(opt => {
+            const val = (opt.value || '').toLowerCase();
+            if (!val || val === 'ingreso') return;
+            importDefaultCategory.innerHTML += `<option value="${val}">${opt.textContent}</option>`;
+        });
+    }
+
+    if (!importDefaultCategory.options.length) {
+        importDefaultCategory.innerHTML = '<option value="sin categoria">Sin categoría</option>';
+    }
+    importDefaultCategory.value = getImportCategoryDefault();
+}
+
+function renderImportPreviewRows() {
+    if (!importRowsContainer) return;
+
+    if (!importPreviewRows.length) {
+        importRowsContainer.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
+        return;
+    }
+
+    importRowsContainer.innerHTML = importPreviewRows.map((row, index) => `
+        <div class="import-row" data-index="${index}">
+            <input type="date" class="import-date" value="${escapeHtml(row.date)}">
+            <input type="text" class="import-concept" value="${escapeHtml(row.concept)}" placeholder="Concepto">
+            <input type="number" class="import-amount" step="0.01" value="${escapeHtml(row.amount)}" placeholder="Importe">
+            <button class="action-btn btn-delete import-remove-row" type="button">Quitar</button>
+        </div>
+    `).join('');
+}
+
+function clearImportPreview(hideCard = true) {
+    importPreviewRows = [];
+    if (importRowsContainer) importRowsContainer.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
+    if (importSummaryText) importSummaryText.textContent = 'Selecciona un fichero para comenzar.';
+    if (hideCard && importPreviewCard) importPreviewCard.style.display = 'none';
+}
+
+function buildImportRowsFromSheet(sheetRows) {
+    let headerRowIndex = -1;
+    let dateCol = -1;
+    let conceptCol = -1;
+    let amountCol = -1;
+
+    for (let i = 0; i < Math.min(sheetRows.length, 20); i++) {
+        const row = sheetRows[i] || [];
+        const normalized = row.map(normalizeImportText);
+
+        const dateIdx = normalized.findIndex(v => v === 'fecha');
+        const conceptIdx = normalized.findIndex(v => v.includes('movimiento') || v.includes('concepto') || v.includes('descripcion'));
+        const amountIdx = normalized.findIndex(v => v.includes('importe') || v.includes('cantidad') || v.includes('monto'));
+
+        if (dateIdx >= 0 && conceptIdx >= 0 && amountIdx >= 0) {
+            headerRowIndex = i;
+            dateCol = dateIdx;
+            conceptCol = conceptIdx;
+            amountCol = amountIdx;
+            break;
+        }
+    }
+
+    if (headerRowIndex < 0) {
+        throw new Error('No he encontrado cabeceras válidas (Fecha, Movimiento, Importe).');
+    }
+
+    const rows = [];
+    let skipped = 0;
+
+    for (let i = headerRowIndex + 1; i < sheetRows.length; i++) {
+        const row = sheetRows[i] || [];
+        const hasContent = row.some(v => String(v || '').trim() !== '');
+        if (!hasContent) continue;
+
+        const parsedDate = parseImportDate(row[dateCol]);
+        const concept = String(row[conceptCol] || '').trim();
+        const sourceAmount = parseImportAmount(row[amountCol]);
+
+        if (!parsedDate || !concept || !Number.isFinite(sourceAmount) || sourceAmount === 0) {
+            skipped++;
+            continue;
+        }
+
+        // En extractos bancarios: cargo = negativo. En la app: gasto = positivo.
+        const appAmount = Number((-sourceAmount).toFixed(2));
+
+        rows.push({
+            date: parsedDate,
+            concept,
+            amount: appAmount
+        });
+    }
+
+    return { rows, skipped, headerRowIndex };
+}
+
+async function handleExcelSelection(file) {
+    if (!file) return;
+
+    if (!window.XLSX) {
+        showCustomAlert('No se pudo cargar la librería de Excel.', 'error');
+        return;
+    }
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const workbook = window.XLSX.read(buffer, { type: 'array', cellDates: true, raw: true });
+        const firstSheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[firstSheetName];
+
+        const sheetRows = window.XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            defval: '',
+            blankrows: false,
+            raw: true
+        });
+
+        const { rows, skipped } = buildImportRowsFromSheet(sheetRows);
+        if (!rows.length) {
+            showCustomAlert('No encontré filas válidas para importar.', 'error');
+            clearImportPreview();
+            return;
+        }
+
+        importPreviewRows = rows;
+        syncImportDefaultsFromFilters();
+        renderImportPreviewRows();
+
+        if (importSummaryText) {
+            importSummaryText.textContent = `Fichero: ${file.name} | Filas listas: ${rows.length} | Filas omitidas: ${skipped}`;
+        }
+        if (importPreviewCard) {
+            importPreviewCard.style.display = 'block';
+            importPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        showCustomAlert(`Importación preparada (${rows.length} filas editables).`, 'success');
+    } catch (error) {
+        console.error('Error leyendo Excel:', error);
+        showCustomAlert(`Error leyendo Excel: ${error.message}`, 'error');
+        clearImportPreview();
+    }
+}
 
 // Función para gestionar visualmente el botón de vista activo
 function updateActiveViewButton(activeId) {
@@ -1673,6 +1944,159 @@ if(searchBtn) {
 
     if (btnExportPDF) {
         btnExportPDF.addEventListener('click', exportToPDF);
+    }
+
+    if (btnImportExcel && excelFileInput) {
+        btnImportExcel.addEventListener('click', () => {
+            syncImportDefaultsFromFilters();
+            excelFileInput.click();
+        });
+
+        excelFileInput.addEventListener('change', async (event) => {
+            const selectedFile = event.target.files?.[0];
+            if (!selectedFile) return;
+
+            await handleExcelSelection(selectedFile);
+
+            // Permite volver a seleccionar el mismo fichero en el siguiente intento.
+            event.target.value = '';
+        });
+    }
+
+    if (importRowsContainer) {
+        importRowsContainer.addEventListener('input', (event) => {
+            const rowElement = event.target.closest('.import-row');
+            if (!rowElement) return;
+            const index = parseInt(rowElement.dataset.index, 10);
+            if (!Number.isInteger(index) || !importPreviewRows[index]) return;
+
+            if (event.target.classList.contains('import-date')) {
+                importPreviewRows[index].date = event.target.value;
+            } else if (event.target.classList.contains('import-concept')) {
+                importPreviewRows[index].concept = event.target.value;
+            } else if (event.target.classList.contains('import-amount')) {
+                importPreviewRows[index].amount = event.target.value;
+            }
+        });
+
+        importRowsContainer.addEventListener('click', (event) => {
+            const removeButton = event.target.closest('.import-remove-row');
+            if (!removeButton) return;
+
+            const rowElement = removeButton.closest('.import-row');
+            if (!rowElement) return;
+            const index = parseInt(rowElement.dataset.index, 10);
+            if (!Number.isInteger(index)) return;
+
+            importPreviewRows.splice(index, 1);
+            renderImportPreviewRows();
+            if (importSummaryText) {
+                importSummaryText.textContent = `Filas listas: ${importPreviewRows.length}`;
+            }
+        });
+    }
+
+    if (btnAddImportRow) {
+        btnAddImportRow.addEventListener('click', () => {
+            const today = new Date().toISOString().split('T')[0];
+            importPreviewRows.push({ date: today, concept: '', amount: '' });
+            if (importPreviewCard) importPreviewCard.style.display = 'block';
+            renderImportPreviewRows();
+            if (importSummaryText) {
+                importSummaryText.textContent = `Filas listas: ${importPreviewRows.length}`;
+            }
+        });
+    }
+
+    if (btnCancelImport) {
+        btnCancelImport.addEventListener('click', () => {
+            clearImportPreview();
+        });
+    }
+
+    if (btnCommitImport) {
+        btnCommitImport.addEventListener('click', async () => {
+            if (!currentUser) {
+                showCustomAlert('Debes iniciar sesión para importar.', 'error');
+                return;
+            }
+
+            const normalizedRows = importPreviewRows.map(row => ({
+                date: String(row.date || '').trim(),
+                concept: String(row.concept || '').trim(),
+                amount: Number(parseImportAmount(row.amount).toFixed(2))
+            }));
+
+            const validRows = normalizedRows.filter(row => row.date && row.concept && Number.isFinite(row.amount) && row.amount !== 0);
+
+            if (!validRows.length) {
+                showCustomAlert('No hay filas válidas para volcar.', 'error');
+                return;
+            }
+
+            const invalidCount = normalizedRows.length - validRows.length;
+            if (invalidCount > 0) {
+                showCustomAlert(`Hay ${invalidCount} filas incompletas. Corrígelas o elimínalas antes de volcar.`, 'error');
+                return;
+            }
+
+            const level0 = (importDefaultLevel?.value || getImportLevelDefault()).trim();
+            const category = (importDefaultCategory?.value || getImportCategoryDefault()).trim().toLowerCase();
+            const bank = 'CAIXA';
+
+            const confirmed = await showCustomConfirm(
+                `Se van a guardar ${validRows.length} movimientos en Firestore.\n\nBanco: ${bank}\nZona: ${level0}\nCategoría: ${category}\n\n¿Continuar?`
+            );
+            if (!confirmed) return;
+
+            btnCommitImport.disabled = true;
+            btnCommitImport.textContent = 'Volcando...';
+
+            try {
+                let batch = writeBatch(db);
+                let batchCount = 0;
+                let totalSaved = 0;
+
+                for (const row of validRows) {
+                    const docRef = doc(collection(db, 'expenses'));
+                    batch.set(docRef, {
+                        uid: currentUser.uid,
+                        level0,
+                        merchant: 'caixa',
+                        bank,
+                        date: row.date,
+                        paymentDate: row.date,
+                        product: row.concept.toLowerCase(),
+                        category,
+                        amount: row.amount
+                    });
+
+                    batchCount++;
+                    totalSaved++;
+
+                    if (batchCount >= 450) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        batchCount = 0;
+                    }
+                }
+
+                if (batchCount > 0) {
+                    await batch.commit();
+                }
+
+                showCustomAlert(`✅ ${totalSaved} movimientos volcados a Firestore.`, 'success');
+                clearImportPreview();
+                loadFilterOptions();
+                searchExpenses();
+            } catch (error) {
+                console.error('Error al volcar importación:', error);
+                showCustomAlert(`Error al volcar: ${error.message}`, 'error');
+            } finally {
+                btnCommitImport.disabled = false;
+                btnCommitImport.textContent = 'Volcar a Firestore';
+            }
+        });
     }
 }
 

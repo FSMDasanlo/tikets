@@ -39,6 +39,48 @@
             <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
             <button class="btn-save" style="margin-top: 10px;">Crear Manual</button>
         </div>
+
+        <!-- Tarjeta 4: Importar Movimientos Bancarios -->
+        <div class="card" id="bankImportCard">
+            <h2>Importar movimientos bancarios</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <label for="bankImportInput" class="btn-save" style="display: block; margin-top: 10px; text-align: center;">Seleccionar Excel</label>
+            <input type="file" id="bankImportInput" style="display: none;" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        </div>
+    </div>
+
+    <!-- Panel de Importación Bancaria -->
+    <div id="bankImportPanel" class="table-container" style="display: none; margin-top: 10px;">
+        <div class="import-preview-header" style="margin-bottom: 10px;">
+            <h3 style="margin: 0;">Previsualización de Importación</h3>
+            <p id="bankImportSummary" style="margin: 8px 0 0; color: #666;">Selecciona un fichero para comenzar.</p>
+        </div>
+
+        <div class="import-config-grid" style="margin-bottom: 12px; grid-template-columns: 1fr 220px;">
+            <div>
+                <label for="bankImportLevel">Zona por defecto</label>
+                <select id="bankImportLevel"></select>
+            </div>
+            <div>
+                <label for="bankImportBank">Banco</label>
+                <input id="bankImportBank" type="text" value="CAIXA" readonly>
+            </div>
+        </div>
+
+        <div class="import-rows-header">
+            <span>Fecha</span>
+            <span>Concepto</span>
+            <span>Categoría</span>
+            <span>Importe</span>
+            <span>Acción</span>
+        </div>
+        <div id="bankImportRows" class="import-rows-container"></div>
+
+        <div class="modal-actions" style="justify-content: flex-end; margin-top: 14px;">
+            <button id="bankImportAddRowBtn" class="btn-nav"><i class="fa-solid fa-plus"></i>Añadir fila</button>
+            <button id="bankImportClearBtn" class="btn-close">Limpiar</button>
+            <button id="bankImportSaveBtn" class="btn-save">Volcar a Firestore</button>
+        </div>
     </div>
 
     <!-- Área de Estado (Movida fuera de las tarjetas) -->
@@ -157,6 +199,7 @@
     <!-- Librerías y Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script type="module" src="js/script.js"></script>
 </body>
 </html>

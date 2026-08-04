@@ -172,8 +172,340 @@ const manualProduct = document.getElementById('manualProduct');
 const manualCategory = document.getElementById('manualCategory');
 const manualAmount = document.getElementById('manualAmount');
 const manualBank = document.getElementById('manualBank');
+const bankImportInput = document.getElementById('bankImportInput');
+const bankImportPanel = document.getElementById('bankImportPanel');
+const bankImportSummary = document.getElementById('bankImportSummary');
+const bankImportLevel = document.getElementById('bankImportLevel');
+const bankImportRows = document.getElementById('bankImportRows');
+const bankImportAddRowBtn = document.getElementById('bankImportAddRowBtn');
+const bankImportClearBtn = document.getElementById('bankImportClearBtn');
+const bankImportSaveBtn = document.getElementById('bankImportSaveBtn');
 
 let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros", "Otros"]; // Fallback por defecto
+let bankImportDataRows = [];
+
+function normalizeImportText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase();
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function toIsoDateFromDateObj(dateObj) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function parseImportDate(rawDate) {
+    if (rawDate instanceof Date && !isNaN(rawDate)) {
+        return toIsoDateFromDateObj(rawDate);
+    }
+
+    if (typeof rawDate === 'number' && Number.isFinite(rawDate)) {
+        const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+        const parsed = new Date(excelEpoch.getTime() + Math.round(rawDate * 86400000));
+        if (!isNaN(parsed)) {
+            const y = parsed.getUTCFullYear();
+            const m = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getUTCDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+    }
+
+    const txt = String(rawDate || '').trim();
+    if (!txt) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) return txt;
+
+    const slash = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (slash) {
+        const day = slash[1].padStart(2, '0');
+        const month = slash[2].padStart(2, '0');
+        const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    const parsed = new Date(txt);
+    return isNaN(parsed) ? '' : toIsoDateFromDateObj(parsed);
+}
+
+function parseImportAmount(rawAmount) {
+    if (typeof rawAmount === 'number') {
+        return Number.isFinite(rawAmount) ? rawAmount : NaN;
+    }
+
+    let txt = String(rawAmount || '').trim();
+    if (!txt) return NaN;
+
+    txt = txt.replace(/€/g, '').replace(/\s/g, '');
+    if (txt.includes('.') && txt.includes(',')) {
+        txt = txt.replace(/\./g, '').replace(',', '.');
+    } else if (txt.includes(',')) {
+        txt = txt.replace(',', '.');
+    }
+
+    const parsed = parseFloat(txt);
+    return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function getDefaultImportCategory() {
+    const first = Array.from(manualCategory?.options || []).find(opt => String(opt.value || '').trim());
+    return first ? String(first.value).trim().toLowerCase() : 'otros';
+}
+
+function getImportCategoryOptionsHtml(selectedCategory) {
+    const options = Array.from(manualCategory?.options || []).filter(opt => String(opt.value || '').trim());
+    if (!options.length) {
+        return `<option value="otros" ${selectedCategory === 'otros' ? 'selected' : ''}>Otros</option>`;
+    }
+
+    return options.map(opt => {
+        const value = String(opt.value).trim().toLowerCase();
+        const selected = value === selectedCategory ? 'selected' : '';
+        return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(opt.textContent)}</option>`;
+    }).join('');
+}
+
+function syncBankImportDefaults() {
+    if (!bankImportLevel) return;
+
+    bankImportLevel.innerHTML = '';
+    Array.from(globalLevel0Input?.options || []).forEach(opt => {
+        if (!opt.value) return;
+        bankImportLevel.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
+    });
+    if (!bankImportLevel.options.length) {
+        bankImportLevel.innerHTML = '<option value="MADRID">MADRID</option>';
+    }
+    if (globalLevel0Input?.value) {
+        bankImportLevel.value = globalLevel0Input.value;
+    }
+
+    const defaultCategory = getDefaultImportCategory();
+    bankImportDataRows = bankImportDataRows.map(row => ({
+        ...row,
+        category: row.category ? String(row.category).toLowerCase() : defaultCategory
+    }));
+    renderBankImportRows();
+}
+
+function renderBankImportRows() {
+    if (!bankImportRows) return;
+
+    if (!bankImportDataRows.length) {
+        bankImportRows.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
+        return;
+    }
+
+    bankImportRows.innerHTML = bankImportDataRows.map((row, index) => `
+        <div class="import-row" data-index="${index}">
+            <input type="date" class="import-date" value="${escapeHtml(row.date)}">
+            <input type="text" class="import-concept" value="${escapeHtml(row.concept)}" placeholder="Concepto">
+            <select class="import-category">${getImportCategoryOptionsHtml(String(row.category || getDefaultImportCategory()).toLowerCase())}</select>
+            <input type="number" class="import-amount" step="0.01" value="${escapeHtml(row.amount)}" placeholder="Importe">
+            <button class="action-btn btn-delete import-remove-row" type="button">Quitar</button>
+        </div>
+    `).join('');
+}
+
+function clearBankImportPreview(hidePanel = true) {
+    bankImportDataRows = [];
+    if (bankImportRows) bankImportRows.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
+    if (bankImportSummary) bankImportSummary.textContent = 'Selecciona un fichero para comenzar.';
+    if (hidePanel && bankImportPanel) bankImportPanel.style.display = 'none';
+}
+
+function buildBankImportRows(sheetRows) {
+    let headerRowIndex = -1;
+    let dateCol = -1;
+    let conceptCol = -1;
+    let amountCol = -1;
+
+    for (let i = 0; i < Math.min(sheetRows.length, 20); i++) {
+        const row = sheetRows[i] || [];
+        const normalized = row.map(normalizeImportText);
+
+        const dateIdx = normalized.findIndex(v => v === 'fecha');
+        const conceptIdx = normalized.findIndex(v => v.includes('movimiento') || v.includes('concepto') || v.includes('descripcion'));
+        const amountIdx = normalized.findIndex(v => v.includes('importe') || v.includes('cantidad') || v.includes('monto'));
+
+        if (dateIdx >= 0 && conceptIdx >= 0 && amountIdx >= 0) {
+            headerRowIndex = i;
+            dateCol = dateIdx;
+            conceptCol = conceptIdx;
+            amountCol = amountIdx;
+            break;
+        }
+    }
+
+    if (headerRowIndex < 0) {
+        throw new Error('No se encontraron cabeceras válidas (Fecha, Movimiento, Importe).');
+    }
+
+    const rows = [];
+    let skipped = 0;
+
+    for (let i = headerRowIndex + 1; i < sheetRows.length; i++) {
+        const row = sheetRows[i] || [];
+        const hasContent = row.some(v => String(v || '').trim() !== '');
+        if (!hasContent) continue;
+
+        const parsedDate = parseImportDate(row[dateCol]);
+        const concept = String(row[conceptCol] || '').trim();
+        const sourceAmount = parseImportAmount(row[amountCol]);
+
+        if (!parsedDate || !concept || !Number.isFinite(sourceAmount) || sourceAmount === 0) {
+            skipped++;
+            continue;
+        }
+
+        // Cargo negativo en banco => gasto positivo en app.
+        const appAmount = Number((-sourceAmount).toFixed(2));
+        rows.push({
+            date: parsedDate,
+            concept,
+            category: getDefaultImportCategory(),
+            amount: appAmount
+        });
+    }
+
+    return { rows, skipped };
+}
+
+async function handleBankImportFile(file) {
+    if (!file) return;
+    if (!window.XLSX) {
+        showCustomAlert('No se pudo cargar la librería Excel.', 'error');
+        return;
+    }
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const workbook = window.XLSX.read(buffer, { type: 'array', cellDates: true, raw: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheetRows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false, raw: true });
+
+        const { rows, skipped } = buildBankImportRows(sheetRows);
+        if (!rows.length) {
+            clearBankImportPreview();
+            showCustomAlert('No hay filas válidas para importar.', 'error');
+            return;
+        }
+
+        bankImportDataRows = rows;
+        syncBankImportDefaults();
+        renderBankImportRows();
+
+        if (bankImportPanel) {
+            bankImportPanel.style.display = 'block';
+            bankImportPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (bankImportSummary) {
+            bankImportSummary.textContent = `Fichero: ${file.name} | Filas listas: ${rows.length} | Filas omitidas: ${skipped}`;
+        }
+
+        showCustomAlert(`Importación preparada (${rows.length} filas editables).`, 'success');
+    } catch (error) {
+        console.error('Error en importación bancaria:', error);
+        clearBankImportPreview();
+        showCustomAlert(`Error leyendo fichero: ${error.message}`, 'error');
+    }
+}
+
+async function commitBankImportToFirestore() {
+    if (!currentUser) {
+        showCustomAlert('Debes iniciar sesión para importar.', 'error');
+        return;
+    }
+
+    const normalizedRows = bankImportDataRows.map(row => ({
+        date: String(row.date || '').trim(),
+        concept: String(row.concept || '').trim(),
+        category: String(row.category || '').trim().toLowerCase(),
+        amount: Number(parseImportAmount(row.amount).toFixed(2))
+    }));
+
+    const validRows = normalizedRows.filter(row => row.date && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
+    if (!validRows.length) {
+        showCustomAlert('No hay filas válidas para volcar.', 'error');
+        return;
+    }
+
+    const invalidCount = normalizedRows.length - validRows.length;
+    if (invalidCount > 0) {
+        showCustomAlert(`Hay ${invalidCount} filas incompletas. Corrígelas antes de volcar.`, 'error');
+        return;
+    }
+
+    const level0 = (bankImportLevel?.value || globalLevel0Input.value || 'MADRID').trim();
+    const bank = 'CAIXA';
+
+    const confirmed = await showCustomConfirm(
+        `Se van a guardar ${validRows.length} movimientos en Firestore.\n\nBanco: ${bank}\nZona: ${level0}\nCategoría: individual por fila\n\n¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    if (bankImportSaveBtn) {
+        bankImportSaveBtn.disabled = true;
+        bankImportSaveBtn.textContent = 'Volcando...';
+    }
+
+    try {
+        let batch = writeBatch(db);
+        let batchCount = 0;
+        let saved = 0;
+
+        for (const row of validRows) {
+            const ref = doc(collection(db, 'expenses'));
+            batch.set(ref, {
+                uid: currentUser.uid,
+                level0,
+                merchant: 'caixa',
+                bank,
+                date: row.date,
+                paymentDate: row.date,
+                product: row.concept.toLowerCase(),
+                category: row.category,
+                amount: row.amount
+            });
+
+            batchCount++;
+            saved++;
+
+            if (batchCount >= 450) {
+                await batch.commit();
+                batch = writeBatch(db);
+                batchCount = 0;
+            }
+        }
+
+        if (batchCount > 0) await batch.commit();
+
+        showCustomAlert(`✅ ${saved} movimientos volcados a Firestore.`, 'success');
+        clearBankImportPreview();
+        loadBankSuggestions();
+    } catch (error) {
+        console.error('Error volcando movimientos:', error);
+        showCustomAlert(`Error al volcar: ${error.message}`, 'error');
+    } finally {
+        if (bankImportSaveBtn) {
+            bankImportSaveBtn.disabled = false;
+            bankImportSaveBtn.textContent = 'Volcar a Firestore';
+        }
+    }
+}
 
 // Función para cargar configuración desde Firebase
 async function loadConfig() {
@@ -214,6 +546,8 @@ async function loadConfig() {
         }
     } catch (e) {
         console.error("Error cargando configuración:", e);
+    } finally {
+        syncBankImportDefaults();
     }
 }
 
@@ -254,6 +588,75 @@ globalDateInput.addEventListener('change', (e) => {
         input.value = newDate;
     });
 });
+
+if (bankImportInput) {
+    bankImportInput.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            await handleBankImportFile(file);
+        }
+        event.target.value = '';
+    });
+}
+
+if (bankImportRows) {
+    bankImportRows.addEventListener('input', (event) => {
+        const rowElement = event.target.closest('.import-row');
+        if (!rowElement) return;
+
+        const index = parseInt(rowElement.dataset.index, 10);
+        if (!Number.isInteger(index) || !bankImportDataRows[index]) return;
+
+        if (event.target.classList.contains('import-date')) {
+            bankImportDataRows[index].date = event.target.value;
+        } else if (event.target.classList.contains('import-concept')) {
+            bankImportDataRows[index].concept = event.target.value;
+        } else if (event.target.classList.contains('import-category')) {
+            bankImportDataRows[index].category = event.target.value;
+        } else if (event.target.classList.contains('import-amount')) {
+            bankImportDataRows[index].amount = event.target.value;
+        }
+    });
+
+    bankImportRows.addEventListener('click', (event) => {
+        const removeBtn = event.target.closest('.import-remove-row');
+        if (!removeBtn) return;
+
+        const rowElement = removeBtn.closest('.import-row');
+        if (!rowElement) return;
+
+        const index = parseInt(rowElement.dataset.index, 10);
+        if (!Number.isInteger(index)) return;
+
+        bankImportDataRows.splice(index, 1);
+        renderBankImportRows();
+        if (bankImportSummary) {
+            bankImportSummary.textContent = `Filas listas: ${bankImportDataRows.length}`;
+        }
+    });
+}
+
+if (bankImportAddRowBtn) {
+    bankImportAddRowBtn.addEventListener('click', () => {
+        const today = new Date().toISOString().split('T')[0];
+        bankImportDataRows.push({ date: today, concept: '', category: getDefaultImportCategory(), amount: '' });
+        if (bankImportPanel) bankImportPanel.style.display = 'block';
+        renderBankImportRows();
+        if (bankImportSummary) {
+            bankImportSummary.textContent = `Filas listas: ${bankImportDataRows.length}`;
+        }
+    });
+}
+
+if (bankImportClearBtn) {
+    bankImportClearBtn.addEventListener('click', () => {
+        clearBankImportPreview();
+    });
+}
+
+if (bankImportSaveBtn) {
+    bankImportSaveBtn.addEventListener('click', commitBankImportToFirestore);
+}
 
 // Función para guardar datos (Simulación BD)
 async function saveDataToDb() {

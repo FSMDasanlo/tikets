@@ -110,6 +110,43 @@
             </div>
         </div>
 
+        <!-- Panel de Importación de Excel -->
+        <div id="importPreviewCard" class="card import-preview-card">
+            <div class="import-preview-header">
+                <h2 style="margin: 0;">Previsualización de Importación</h2>
+                <p id="importSummaryText" style="margin: 8px 0 0; color: #666;">Selecciona un fichero para comenzar.</p>
+            </div>
+
+            <div class="import-config-grid">
+                <div class="form-group" style="margin: 0;">
+                    <label for="importDefaultLevel">Zona por defecto</label>
+                    <select id="importDefaultLevel"></select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="importDefaultCategory">Categoría por defecto</label>
+                    <select id="importDefaultCategory"></select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="importDefaultBank">Banco</label>
+                    <input id="importDefaultBank" type="text" value="CAIXA" readonly>
+                </div>
+            </div>
+
+            <div class="import-rows-header">
+                <span>Fecha</span>
+                <span>Concepto</span>
+                <span>Importe</span>
+                <span>Acción</span>
+            </div>
+            <div id="importRowsContainer" class="import-rows-container"></div>
+
+            <div class="modal-actions" style="justify-content: flex-end; margin-top: 15px;">
+                <button id="btnAddImportRow" class="btn-nav"><i class="fa-solid fa-plus"></i>Añadir fila</button>
+                <button id="btnCancelImport" class="btn-close">Limpiar</button>
+                <button id="btnCommitImport" class="btn-save">Volcar a Firestore</button>
+            </div>
+        </div>
+
         <!-- Tabla Resultados -->
         <div class="table-container" style="margin-top: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -217,6 +254,7 @@
     <!-- Librerías para exportar a PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script type="module" src="js/consultas.js"></script>
 </body>
 </html>
