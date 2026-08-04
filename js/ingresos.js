@@ -414,9 +414,11 @@ function renderTable(data) {
               <td data-label="Concepto">${item.concept}</td>
               <td data-label="Importe" style="text-align: right; font-weight: bold; color: #28a745;">${formatCurrency(amount)}</td>
               <td data-label="Acciones" style="text-align: center;">
-                  <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;" title="Duplicar">📄</button>
-                  <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px;" title="Editar">✏️</button>
-                  <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Borrar">🗑️</button>
+                  <div class="income-actions-inline">
+                    <button class="action-btn btn-duplicate" data-id="${item.id}" style="background-color: #28a745; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Duplicar">📄</button>
+                    <button class="action-btn btn-edit" data-id="${item.id}" style="background-color: #ffc107; color: #333; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;" title="Editar">✏️</button>
+                    <button class="action-btn btn-delete" data-id="${item.id}" style="background-color: #dc3545; padding: 5px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;" title="Borrar">🗑️</button>
+                  </div>
               </td>
           `;
       incomeTableBody.appendChild(row);
