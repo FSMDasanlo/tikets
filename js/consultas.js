@@ -256,6 +256,23 @@ function getImportCategoryDefault() {
     return 'sin categoria';
 }
 
+function getImportCategoryOptionsHtml(selectedCategory = '') {
+    const selected = String(selectedCategory || '').toLowerCase();
+    const fallback = getImportCategoryDefault();
+
+    if (!importDefaultCategory || !importDefaultCategory.options.length) {
+        const value = selected || fallback;
+        return `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
+    }
+
+    return Array.from(importDefaultCategory.options).map(opt => {
+        const optionValue = String(opt.value || '').toLowerCase();
+        const optionLabel = opt.textContent || optionValue;
+        const isSelected = optionValue === (selected || fallback);
+        return `<option value="${escapeHtml(optionValue)}" ${isSelected ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
+    }).join('');
+}
+
 function syncImportDefaultsFromFilters() {
     if (!importDefaultLevel || !importDefaultCategory) return;
 
@@ -302,6 +319,7 @@ function renderImportPreviewRows() {
         <div class="import-row" data-index="${index}">
             <input type="date" class="import-date" value="${escapeHtml(row.date)}">
             <input type="text" class="import-concept" value="${escapeHtml(row.concept)}" placeholder="Concepto">
+            <select class="import-category">${getImportCategoryOptionsHtml(String(row.category || getImportCategoryDefault()).toLowerCase())}</select>
             <input type="number" class="import-amount" step="0.01" value="${escapeHtml(row.amount)}" placeholder="Importe">
             <button class="action-btn btn-delete import-remove-row" type="button">Quitar</button>
         </div>
@@ -365,6 +383,7 @@ function buildImportRowsFromSheet(sheetRows) {
         rows.push({
             date: parsedDate,
             concept,
+            category: getImportCategoryDefault(),
             amount: appAmount
         });
     }
@@ -1974,6 +1993,8 @@ if(searchBtn) {
                 importPreviewRows[index].date = event.target.value;
             } else if (event.target.classList.contains('import-concept')) {
                 importPreviewRows[index].concept = event.target.value;
+            } else if (event.target.classList.contains('import-category')) {
+                importPreviewRows[index].category = event.target.value;
             } else if (event.target.classList.contains('import-amount')) {
                 importPreviewRows[index].amount = event.target.value;
             }
@@ -1999,7 +2020,7 @@ if(searchBtn) {
     if (btnAddImportRow) {
         btnAddImportRow.addEventListener('click', () => {
             const today = new Date().toISOString().split('T')[0];
-            importPreviewRows.push({ date: today, concept: '', amount: '' });
+            importPreviewRows.push({ date: today, concept: '', category: getImportCategoryDefault(), amount: '' });
             if (importPreviewCard) importPreviewCard.style.display = 'block';
             renderImportPreviewRows();
             if (importSummaryText) {
@@ -2024,10 +2045,11 @@ if(searchBtn) {
             const normalizedRows = importPreviewRows.map(row => ({
                 date: String(row.date || '').trim(),
                 concept: String(row.concept || '').trim(),
+                category: String(row.category || getImportCategoryDefault()).trim().toLowerCase(),
                 amount: Number(parseImportAmount(row.amount).toFixed(2))
             }));
 
-            const validRows = normalizedRows.filter(row => row.date && row.concept && Number.isFinite(row.amount) && row.amount !== 0);
+            const validRows = normalizedRows.filter(row => row.date && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
 
             if (!validRows.length) {
                 showCustomAlert('No hay filas válidas para volcar.', 'error');
@@ -2041,11 +2063,10 @@ if(searchBtn) {
             }
 
             const level0 = (importDefaultLevel?.value || getImportLevelDefault()).trim();
-            const category = (importDefaultCategory?.value || getImportCategoryDefault()).trim().toLowerCase();
             const bank = 'CAIXA';
 
             const confirmed = await showCustomConfirm(
-                `Se van a guardar ${validRows.length} movimientos en Firestore.\n\nBanco: ${bank}\nZona: ${level0}\nCategoría: ${category}\n\n¿Continuar?`
+                `Se van a guardar ${validRows.length} movimientos en Firestore.\n\nBanco: ${bank}\nZona: ${level0}\nCategoría: individual por fila\n\n¿Continuar?`
             );
             if (!confirmed) return;
 
@@ -2067,7 +2088,7 @@ if(searchBtn) {
                         date: row.date,
                         paymentDate: row.date,
                         product: row.concept.toLowerCase(),
-                        category,
+                        category: row.category,
                         amount: row.amount
                     });
 
