@@ -318,6 +318,7 @@ function renderImportPreviewRows() {
     importRowsContainer.innerHTML = importPreviewRows.map((row, index) => `
         <div class="import-row" data-index="${index}">
             <input type="date" class="import-date" value="${escapeHtml(row.date)}">
+            <input type="text" class="import-merchant" value="${escapeHtml(row.merchant)}" placeholder="Comercio">
             <input type="text" class="import-concept" value="${escapeHtml(row.concept)}" placeholder="Concepto">
             <select class="import-category">${getImportCategoryOptionsHtml(String(row.category || getImportCategoryDefault()).toLowerCase())}</select>
             <input type="number" class="import-amount" step="0.01" value="${escapeHtml(row.amount)}" placeholder="Importe">
@@ -331,6 +332,28 @@ function clearImportPreview(hideCard = true) {
     if (importRowsContainer) importRowsContainer.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
     if (importSummaryText) importSummaryText.textContent = 'Selecciona un fichero para comenzar.';
     if (hideCard && importPreviewCard) importPreviewCard.style.display = 'none';
+}
+
+async function resolveImportHistory(rows) {
+    if (!currentUser) return rows;
+
+    const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('uid', '==', currentUser.uid)));
+    const expenses = expensesSnap.docs.map(expenseDoc => expenseDoc.data());
+    const getDateKey = expense => parseImportDate(expense.date || expense.paymentDate) || '';
+    const latestBy = items => items.reduce((latest, item) => {
+        if (!latest || getDateKey(item) > getDateKey(latest)) return item;
+        return latest;
+    }, null);
+
+    return rows.map(row => {
+        const merchantKey = normalizeImportText(row.merchant);
+        const merchantExpenses = expenses.filter(expense => normalizeImportText(expense.merchant) === merchantKey);
+        const latestMerchantExpense = latestBy(merchantExpenses);
+        const category = String(latestMerchantExpense?.category || row.category || getImportCategoryDefault()).trim().toLowerCase();
+        const latestProduct = latestBy(merchantExpenses.filter(expense => normalizeImportText(expense.category) === normalizeImportText(category)));
+
+        return { ...row, category, concept: String(latestProduct?.product || '').trim() };
+    });
 }
 
 function buildImportRowsFromSheet(sheetRows) {
@@ -382,7 +405,8 @@ function buildImportRowsFromSheet(sheetRows) {
 
         rows.push({
             date: parsedDate,
-            concept,
+            merchant: concept,
+            concept: '',
             category: getImportCategoryDefault(),
             amount: appAmount
         });
@@ -419,7 +443,7 @@ async function handleExcelSelection(file) {
             return;
         }
 
-        importPreviewRows = rows;
+        importPreviewRows = await resolveImportHistory(rows);
         syncImportDefaultsFromFilters();
         renderImportPreviewRows();
 
@@ -1991,6 +2015,8 @@ if(searchBtn) {
 
             if (event.target.classList.contains('import-date')) {
                 importPreviewRows[index].date = event.target.value;
+            } else if (event.target.classList.contains('import-merchant')) {
+                importPreviewRows[index].merchant = event.target.value;
             } else if (event.target.classList.contains('import-concept')) {
                 importPreviewRows[index].concept = event.target.value;
             } else if (event.target.classList.contains('import-category')) {
@@ -2020,7 +2046,7 @@ if(searchBtn) {
     if (btnAddImportRow) {
         btnAddImportRow.addEventListener('click', () => {
             const today = new Date().toISOString().split('T')[0];
-            importPreviewRows.push({ date: today, concept: '', category: getImportCategoryDefault(), amount: '' });
+            importPreviewRows.push({ date: today, merchant: '', concept: '', category: getImportCategoryDefault(), amount: '' });
             if (importPreviewCard) importPreviewCard.style.display = 'block';
             renderImportPreviewRows();
             if (importSummaryText) {
@@ -2044,12 +2070,13 @@ if(searchBtn) {
 
             const normalizedRows = importPreviewRows.map(row => ({
                 date: String(row.date || '').trim(),
+                merchant: String(row.merchant || '').trim(),
                 concept: String(row.concept || '').trim(),
                 category: String(row.category || getImportCategoryDefault()).trim().toLowerCase(),
                 amount: Number(parseImportAmount(row.amount).toFixed(2))
             }));
 
-            const validRows = normalizedRows.filter(row => row.date && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
+            const validRows = normalizedRows.filter(row => row.date && row.merchant && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
 
             if (!validRows.length) {
                 showCustomAlert('No hay filas válidas para volcar.', 'error');
@@ -2083,7 +2110,7 @@ if(searchBtn) {
                     batch.set(docRef, {
                         uid: currentUser.uid,
                         level0,
-                        merchant: 'caixa',
+                        merchant: row.merchant.toLowerCase(),
                         bank,
                         date: row.date,
                         paymentDate: row.date,

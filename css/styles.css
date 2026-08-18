@@ -627,7 +627,7 @@ tfoot td {
 
 .import-rows-header {
     display: grid;
-    grid-template-columns: 160px 1fr 180px 130px 90px;
+    grid-template-columns: 160px 1fr 1fr 180px 130px 90px;
     gap: 8px;
     font-weight: bold;
     color: #666;
@@ -646,7 +646,7 @@ tfoot td {
 
 .import-row {
     display: grid;
-    grid-template-columns: 160px 1fr 180px 130px 90px;
+    grid-template-columns: 160px 1fr 1fr 180px 130px 90px;
     gap: 8px;
     margin-bottom: 8px;
 }

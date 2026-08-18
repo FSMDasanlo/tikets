@@ -312,6 +312,7 @@ function renderBankImportRows() {
     bankImportRows.innerHTML = bankImportDataRows.map((row, index) => `
         <div class="import-row" data-index="${index}">
             <input type="date" class="import-date" value="${escapeHtml(row.date)}">
+            <input type="text" class="import-merchant" value="${escapeHtml(row.merchant)}" placeholder="Comercio">
             <input type="text" class="import-concept" value="${escapeHtml(row.concept)}" placeholder="Concepto">
             <select class="import-category">${getImportCategoryOptionsHtml(String(row.category || getDefaultImportCategory()).toLowerCase())}</select>
             <input type="number" class="import-amount" step="0.01" value="${escapeHtml(row.amount)}" placeholder="Importe">
@@ -325,6 +326,28 @@ function clearBankImportPreview(hidePanel = true) {
     if (bankImportRows) bankImportRows.innerHTML = '<div class="import-empty">No hay filas para importar.</div>';
     if (bankImportSummary) bankImportSummary.textContent = 'Selecciona un fichero para comenzar.';
     if (hidePanel && bankImportPanel) bankImportPanel.style.display = 'none';
+}
+
+async function resolveBankImportHistory(rows) {
+    if (!currentUser) return rows;
+
+    const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('uid', '==', currentUser.uid)));
+    const expenses = expensesSnap.docs.map(expenseDoc => expenseDoc.data());
+    const getDateKey = expense => parseImportDate(expense.date || expense.paymentDate) || '';
+    const latestBy = items => items.reduce((latest, item) => {
+        if (!latest || getDateKey(item) > getDateKey(latest)) return item;
+        return latest;
+    }, null);
+
+    return rows.map(row => {
+        const merchantKey = normalizeImportText(row.merchant);
+        const merchantExpenses = expenses.filter(expense => normalizeImportText(expense.merchant) === merchantKey);
+        const latestMerchantExpense = latestBy(merchantExpenses);
+        const category = String(latestMerchantExpense?.category || row.category || getDefaultImportCategory()).trim().toLowerCase();
+        const latestProduct = latestBy(merchantExpenses.filter(expense => normalizeImportText(expense.category) === normalizeImportText(category)));
+
+        return { ...row, category, concept: String(latestProduct?.product || '').trim() };
+    });
 }
 
 function buildBankImportRows(sheetRows) {
@@ -375,7 +398,8 @@ function buildBankImportRows(sheetRows) {
         const appAmount = Number((-sourceAmount).toFixed(2));
         rows.push({
             date: parsedDate,
-            concept,
+            merchant: concept,
+            concept: '',
             category: getDefaultImportCategory(),
             amount: appAmount
         });
@@ -404,7 +428,7 @@ async function handleBankImportFile(file) {
             return;
         }
 
-        bankImportDataRows = rows;
+        bankImportDataRows = await resolveBankImportHistory(rows);
         syncBankImportDefaults();
         renderBankImportRows();
 
@@ -432,12 +456,13 @@ async function commitBankImportToFirestore() {
 
     const normalizedRows = bankImportDataRows.map(row => ({
         date: String(row.date || '').trim(),
+        merchant: String(row.merchant || '').trim(),
         concept: String(row.concept || '').trim(),
         category: String(row.category || '').trim().toLowerCase(),
         amount: Number(parseImportAmount(row.amount).toFixed(2))
     }));
 
-    const validRows = normalizedRows.filter(row => row.date && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
+    const validRows = normalizedRows.filter(row => row.date && row.merchant && row.concept && row.category && Number.isFinite(row.amount) && row.amount !== 0);
     if (!validRows.length) {
         showCustomAlert('No hay filas válidas para volcar.', 'error');
         return;
@@ -472,7 +497,7 @@ async function commitBankImportToFirestore() {
             batch.set(ref, {
                 uid: currentUser.uid,
                 level0,
-                merchant: 'caixa',
+                merchant: row.merchant.toLowerCase(),
                 bank,
                 date: row.date,
                 paymentDate: row.date,
@@ -609,6 +634,8 @@ if (bankImportRows) {
 
         if (event.target.classList.contains('import-date')) {
             bankImportDataRows[index].date = event.target.value;
+        } else if (event.target.classList.contains('import-merchant')) {
+            bankImportDataRows[index].merchant = event.target.value;
         } else if (event.target.classList.contains('import-concept')) {
             bankImportDataRows[index].concept = event.target.value;
         } else if (event.target.classList.contains('import-category')) {
@@ -639,7 +666,7 @@ if (bankImportRows) {
 if (bankImportAddRowBtn) {
     bankImportAddRowBtn.addEventListener('click', () => {
         const today = new Date().toISOString().split('T')[0];
-        bankImportDataRows.push({ date: today, concept: '', category: getDefaultImportCategory(), amount: '' });
+        bankImportDataRows.push({ date: today, merchant: '', concept: '', category: getDefaultImportCategory(), amount: '' });
         if (bankImportPanel) bankImportPanel.style.display = 'block';
         renderBankImportRows();
         if (bankImportSummary) {
