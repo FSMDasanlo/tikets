@@ -56,9 +56,17 @@
         <!-- Herramientas de Limpieza -->
         <div class="card" style="width: 100%; max-width: 450px; cursor: default; transform: none; border: 1px solid #6f42c1;">
             <h2>Limpieza de Datos</h2>
-            <p>Agrupa conceptos escritos de forma distinta (ej: 'Gasolina' y 'Gasoleo') para que aparezcan juntos en las estadísticas.</p>
+            <p>Agrupa conceptos, comercios o categorías escritos de forma distinta para que aparezcan juntos en las estadísticas.</p>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label for="unifyType">Tipo de dato</label>
+                <select id="unifyType">
+                    <option value="product">Conceptos</option>
+                    <option value="merchant">Comercios</option>
+                    <option value="category">Categorías</option>
+                </select>
+            </div>
             <button id="unifyBtn" class="btn-save" style="background-color: #6f42c1; margin-top: 10px;">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Unificar Conceptos
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Unificar datos
             </button>
         </div>
 

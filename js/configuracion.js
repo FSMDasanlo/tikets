@@ -465,31 +465,36 @@ if (migrateBtn) {
   });
 }
 
-// --- UNIFICAR CONCEPTOS (PRODUCTOS) ---
+// --- UNIFICAR DATOS DE GASTOS ---
 if (unifyBtn) {
   unifyBtn.addEventListener("click", async () => {
     const originalText = unifyBtn.textContent;
+    const unifyTypes = {
+      product: { label: "Conceptos", singular: "concepto", field: "product" },
+      merchant: { label: "Comercios", singular: "comercio", field: "merchant" },
+      category: { label: "Categorías", singular: "categoría", field: "category" },
+    };
+    const selectedType = unifyTypes[document.getElementById("unifyType").value];
     try {
       unifyBtn.disabled = true;
-      unifyBtn.textContent = "Cargando conceptos...";
+      unifyBtn.textContent = `Cargando ${selectedType.label.toLowerCase()}...`;
 
-      // 1. Obtener todos los gastos para extraer conceptos únicos
+      // 1. Obtener todos los gastos para extraer los valores únicos del campo elegido
       const q = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
       const querySnapshot = await getDocs(q);
-      const conceptCounts = {};
+      const valueCounts = {};
 
       querySnapshot.forEach((docSnap) => {
-        // Eliminamos toLowerCase() para respetar las mayúsculas originales en el listado
-        const prod = (docSnap.data().product || "").trim();
-        if (prod) {
-          conceptCounts[prod] = (conceptCounts[prod] || 0) + 1;
+        const value = (docSnap.data()[selectedType.field] || "").trim();
+        if (value) {
+          valueCounts[value] = (valueCounts[value] || 0) + 1;
         }
       });
 
-      const sortedConcepts = Object.keys(conceptCounts).sort();
+      const sortedValues = Object.keys(valueCounts).sort();
 
-      if (sortedConcepts.length === 0) {
-        showCustomAlert("No se encontraron conceptos para unificar.", "neutral");
+      if (sortedValues.length === 0) {
+        showCustomAlert(`No se encontraron ${selectedType.label.toLowerCase()} para unificar.`, "neutral");
         return;
       }
 
@@ -505,23 +510,23 @@ if (unifyBtn) {
 
       modal.innerHTML = `
         <div class="modal-content" style="max-width: 500px; max-height: 85vh; display: flex; flex-direction: column;">
-            <h2 style="margin-top: 0;">Unificar Conceptos</h2>
+          <h2 style="margin-top: 0;">Unificar ${selectedType.label}</h2>
             <p style="font-size: 0.9rem; color: #666; margin-bottom: 10px;">
-                Selecciona los conceptos que quieres renombrar masivamente:
+            Selecciona los ${selectedType.label.toLowerCase()} que quieres renombrar masivamente:
             </p>
             
             <div style="flex: 1; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: left; background: #fafafa;">
-                ${sortedConcepts.map(c => `
+            ${sortedValues.map(value => `
                     <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer; font-size: 0.95rem; padding: 4px; border-radius: 4px;">
-                        <input type="checkbox" class="concept-item" value="${c}" style="width: auto; margin: 0;"> 
-                        <span>${c} <small style="color: #999;">(${conceptCounts[c]} registros)</small></span>
+                <input type="checkbox" class="unify-item" value="${value}" style="width: auto; margin: 0;"> 
+                <span>${value} <small style="color: #999;">(${valueCounts[value]} registros)</small></span>
                     </label>
                 `).join("")}
             </div>
 
             <div class="form-group">
-                <label>Nuevo nombre unificado:</label>
-                <input type="text" id="targetConceptName" placeholder="Ej: GASOLINA">
+            <label>Nuevo nombre unificado:</label>
+            <input type="text" id="targetUnifyName" placeholder="Nombre final">
             </div>
 
             <div class="modal-actions">
@@ -531,28 +536,35 @@ if (unifyBtn) {
         </div>
       `;
 
+      modal.style.visibility = "visible";
+      modal.style.opacity = "1";
       modal.style.display = "flex";
       void modal.offsetWidth;
       modal.classList.add("show");
 
       const closeUnifyModal = () => {
         modal.classList.remove("show");
-        setTimeout(() => (modal.style.display = "none"), 300);
+        setTimeout(() => {
+          modal.style.display = "none";
+          modal.style.visibility = "";
+          modal.style.opacity = "";
+        }, 300);
       };
 
       document.getElementById("cancelUnifyBtn").onclick = closeUnifyModal;
       document.getElementById("confirmUnifyBtn").onclick = async () => {
-        const selected = Array.from(modal.querySelectorAll(".concept-item:checked")).map(cb => cb.value);
-        const newName = document.getElementById("targetConceptName").value.trim();
+        const selected = Array.from(modal.querySelectorAll(".unify-item:checked")).map(cb => cb.value);
+        const newName = document.getElementById("targetUnifyName").value.trim();
+        const finalName = selectedType.field === "category" ? newName.toLowerCase() : newName;
 
-        if (selected.length < 2) { showCustomAlert("Selecciona al menos 2 conceptos.", "error"); return; }
+        if (selected.length < 2) { showCustomAlert(`Selecciona al menos 2 ${selectedType.label.toLowerCase()}.`, "error"); return; }
         if (!newName) { showCustomAlert("Escribe el nombre final.", "error"); return; }
 
         // Ocultar temporalmente este modal para que se vea bien la confirmación
         modal.style.visibility = "hidden";
         modal.style.opacity = "0";
 
-        const confirmed = await showCustomConfirm(`¿Seguro que quieres unificar estos ${selected.length} conceptos en "${newName}"?`);
+        const confirmed = await showCustomConfirm(`¿Seguro que quieres unificar estos ${selected.length} ${selectedType.label.toLowerCase()} en "${finalName}"?`);
         
         if (!confirmed) {
             modal.style.visibility = "visible";
@@ -564,28 +576,31 @@ if (unifyBtn) {
         unifyBtn.disabled = true;
 
         try {
-          // Determinar la categoría más común entre los conceptos seleccionados para usarla como destino
-          const catCounts = {};
-          querySnapshot.docs.forEach(docSnap => {
-            const data = docSnap.data();
-            const prod = (data.product || "").trim();
-            if (selected.includes(prod)) {
-              const cat = (data.category || "").toLowerCase();
-              if (cat) catCounts[cat] = (catCounts[cat] || 0) + 1;
-            }
-          });
-          const sortedCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
-          const targetCategory = sortedCats.length > 0 ? sortedCats[0][0] : null;
+          let targetCategory = null;
+          if (selectedType.field === "product") {
+            const categoryCounts = {};
+            querySnapshot.docs.forEach(docSnap => {
+              const data = docSnap.data();
+              const product = (data.product || "").trim();
+              if (selected.includes(product)) {
+                const category = (data.category || "").toLowerCase();
+                if (category) categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+              }
+            });
+            const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
+            targetCategory = sortedCategories.length > 0 ? sortedCategories[0][0] : null;
+          }
 
           let batch = writeBatch(db);
           let count = 0;
           let totalUpdated = 0;
 
           for (const oldName of selected) {
-            // La comparación ahora es exacta (case-sensitive) según lo seleccionado en la lista
-            const docsToUpdate = querySnapshot.docs.filter(d => (d.data().product || "").trim() === oldName);
+            const docsToUpdate = querySnapshot.docs.filter(
+              docSnap => (docSnap.data()[selectedType.field] || "").trim() === oldName,
+            );
             for (const docSnap of docsToUpdate) {
-              const updateData = { product: newName };
+              const updateData = { [selectedType.field]: finalName };
               if (targetCategory) updateData.category = targetCategory;
               
               batch.update(docSnap.ref, updateData);
@@ -594,6 +609,32 @@ if (unifyBtn) {
             }
           }
           if (count > 0) await batch.commit();
+
+          if (selectedType.field === "category") {
+            const categoriesSnapshot = await getDocs(
+              query(collection(db, "categories"), where("uid", "==", currentUser.uid)),
+            );
+            const categoryDocs = categoriesSnapshot.docs.filter(docSnap =>
+              selected.includes((docSnap.data().name || "").trim()),
+            );
+            const destinationDoc = categoriesSnapshot.docs.find(
+              docSnap => (docSnap.data().name || "").trim() === finalName,
+            );
+            const categoryBatch = writeBatch(db);
+            const categoryToKeep = destinationDoc || categoryDocs[0];
+
+            if (categoryToKeep && !destinationDoc) {
+              categoryBatch.update(categoryToKeep.ref, { name: finalName });
+            }
+            categoryDocs.forEach(docSnap => {
+              if (docSnap.ref.path !== categoryToKeep?.ref.path) {
+                categoryBatch.delete(docSnap.ref);
+              }
+            });
+            if (categoryToKeep) await categoryBatch.commit();
+            loadCollection("categories", categoriesList);
+          }
+
           unifyBtn.textContent = originalText;
           showCustomAlert(`✅ Éxito: ${totalUpdated} registros actualizados.`, "success");
         } catch (err) {
@@ -605,7 +646,7 @@ if (unifyBtn) {
       };
     } catch (error) { 
         console.error(error); 
-        showCustomAlert("Error al procesar conceptos.", "error");
+      showCustomAlert(`Error al procesar ${selectedType.label.toLowerCase()}.`, "error");
         unifyBtn.disabled = false;
         unifyBtn.textContent = originalText;
     }
