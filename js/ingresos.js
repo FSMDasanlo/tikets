@@ -140,10 +140,121 @@ const totalIncomeSpan = document.getElementById("totalIncome");
 const incomeTableHead = document.querySelector("#incomeTable thead");
 const btnViewDetail = document.getElementById("btnViewDetail");
 const btnViewByConcept = document.getElementById("btnViewByConcept");
+const monthlyBalancePanel = document.getElementById("monthlyBalancePanel");
+const monthlyBalanceTitle = document.getElementById("monthlyBalanceTitle");
+const monthlyBalanceCanvas = document.getElementById("monthlyBalanceChart");
 
 let sortState = { column: "date", direction: "desc" }; // Estado de ordenación
 let lastFilteredIncomes = []; // Almacenamos el resultado filtrado para re-ordenar sin consultar
 let currentViewMode = "detail"; // 'detail' o 'concept'
+let monthlyBalanceChart = null;
+let monthlyBalanceRequest = 0;
+
+if (filterBank) {
+  filterBank.addEventListener("change", () => {
+    const requestId = ++monthlyBalanceRequest;
+    monthlyBalancePanel.hidden = true;
+    if (monthlyBalanceChart) {
+      monthlyBalanceChart.destroy();
+      monthlyBalanceChart = null;
+    }
+    if (filterBank.value) renderMonthlyBankChart(requestId);
+  });
+}
+
+async function renderMonthlyBankChart(requestId) {
+  const bank = filterBank.value.trim().toUpperCase();
+  if (!currentUser || !bank || typeof Chart === "undefined") return;
+
+  try {
+    const expensesSnapshot = await getDocs(query(
+      collection(db, "expenses"),
+      where("uid", "==", currentUser.uid),
+    ));
+    if (requestId !== monthlyBalanceRequest || filterBank.value.trim().toUpperCase() !== bank) return;
+
+    const movements = [];
+    currentIncomesData.forEach((item) => {
+      if ((item.bank || "").trim().toUpperCase() !== bank || !item.date) return;
+      movements.push({ date: item.date, amount: parseFloat(item.amount) || 0 });
+    });
+    expensesSnapshot.forEach((expenseDoc) => {
+      const expense = expenseDoc.data();
+      const date = expense.paymentDate || expense.date;
+      if ((expense.bank || "").trim().toUpperCase() !== bank || !date) return;
+      movements.push({ date, amount: -(parseFloat(expense.amount) || 0) });
+    });
+
+    if (!movements.length) return;
+
+    movements.sort((a, b) => a.date.localeCompare(b.date));
+    const [firstYear, firstMonth] = movements[0].date.split("-").map(Number);
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 1;
+    const labels = [];
+    const balances = [];
+    let movementIndex = 0;
+    let balance = 0;
+
+    for (let year = firstYear, month = firstMonth;
+      year < endYear || (year === endYear && month <= endMonth);
+      month++) {
+      if (month > 12) {
+        month = 1;
+        year++;
+      }
+      const snapshotDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      while (movementIndex < movements.length && movements[movementIndex].date <= snapshotDate) {
+        balance += movements[movementIndex].amount;
+        movementIndex++;
+      }
+      labels.push(new Intl.DateTimeFormat("es-ES", {
+        month: "short",
+        year: "numeric",
+      }).format(new Date(year, month - 1, 1)));
+      balances.push(balance);
+    }
+
+    monthlyBalanceTitle.textContent = `Evolución del saldo: ${bank}`;
+    monthlyBalancePanel.hidden = false;
+    monthlyBalanceChart = new Chart(monthlyBalanceCanvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Saldo",
+          data: balances,
+          borderColor: "#28a745",
+          backgroundColor: "rgba(40, 167, 69, 0.12)",
+          pointBackgroundColor: "#28a745",
+          pointRadius: 4,
+          tension: 0.2,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: (context) => formatCurrency(context.parsed.y) },
+          },
+        },
+        scales: {
+          y: {
+            ticks: { callback: (value) => formatCurrency(value) },
+          },
+        },
+      },
+    });
+  } catch (error) {
+    if (requestId !== monthlyBalanceRequest) return;
+    console.error("Error creando la gráfica mensual:", error);
+    showCustomAlert("Error al cargar la evolución del banco.", "error");
+  }
+}
 
 // Función para gestionar visualmente el botón de vista activo
 function updateActiveViewButton(activeId) {
