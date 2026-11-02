@@ -42,11 +42,41 @@
 
         <!-- Tarjeta 4: Importar Movimientos Bancarios -->
         <div class="card" id="bankImportCard">
-            <h2>Importar movimientos bancarios</h2>
+            <h2>Importar Movimientos</h2>
             <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <label for="bankImportInput" class="btn-save" style="display: block; margin-top: 10px; text-align: center;">Seleccionar Excel</label>
+            <label for="bankImportInput" class="btn-save" style="display: block; margin-top: 10px; text-align: center;">Seleccionar</label>
             <input type="file" id="bankImportInput" style="display: none;" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
         </div>
+
+        <!-- Tarjeta 5: Comprobar Movimientos -->
+        <div class="card" id="bankCheckCard">
+            <h2>Comprobar Movimientos</h2>
+            <svg class="card-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <label for="bankCheckInput" class="btn-save" style="display: block; margin-top: 10px; text-align: center;">Seleccionar</label>
+            <input type="file" id="bankCheckInput" style="display: none;" accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        </div>
+    </div>
+
+    <!-- Panel de Comprobación de Movimientos -->
+    <div id="bankCheckPanel" class="table-container" style="display: none; margin-top: 10px;">
+        <h3 style="margin: 0;">Comprobación de movimientos</h3>
+        <p id="bankCheckSummary" style="margin: 8px 0 12px; color: #666;"></p>
+        <div class="import-config-grid" style="grid-template-columns: 1fr 1fr 1fr auto; align-items: end;">
+            <div>
+                <label for="bankCheckBank">Banco (vacío = todos)</label>
+                <input id="bankCheckBank" type="text" value="CAIXA" list="bankSuggestions" placeholder="Banco">
+            </div>
+            <div>
+                <label for="bankCheckFrom">Desde</label>
+                <input id="bankCheckFrom" type="date">
+            </div>
+            <div>
+                <label for="bankCheckTo">Hasta</label>
+                <input id="bankCheckTo" type="date">
+            </div>
+            <button id="bankCheckRunBtn" class="btn-save" type="button">Comprobar</button>
+        </div>
+        <div id="bankCheckResults"></div>
     </div>
 
     <!-- Panel de Importación Bancaria -->
@@ -63,7 +93,7 @@
             </div>
             <div>
                 <label for="bankImportBank">Banco</label>
-                <input id="bankImportBank" type="text" value="CAIXA" readonly>
+                <input id="bankImportBank" type="text" value="CAIXA" list="bankSuggestions" placeholder="Banco del movimiento">
             </div>
         </div>
 

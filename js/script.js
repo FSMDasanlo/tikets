@@ -176,10 +176,22 @@ const bankImportInput = document.getElementById('bankImportInput');
 const bankImportPanel = document.getElementById('bankImportPanel');
 const bankImportSummary = document.getElementById('bankImportSummary');
 const bankImportLevel = document.getElementById('bankImportLevel');
+const bankImportBank = document.getElementById('bankImportBank');
 const bankImportRows = document.getElementById('bankImportRows');
 const bankImportAddRowBtn = document.getElementById('bankImportAddRowBtn');
 const bankImportClearBtn = document.getElementById('bankImportClearBtn');
 const bankImportSaveBtn = document.getElementById('bankImportSaveBtn');
+const bankCheckInput = document.getElementById('bankCheckInput');
+const bankCheckPanel = document.getElementById('bankCheckPanel');
+const bankCheckSummary = document.getElementById('bankCheckSummary');
+const bankCheckBank = document.getElementById('bankCheckBank');
+const bankCheckFrom = document.getElementById('bankCheckFrom');
+const bankCheckTo = document.getElementById('bankCheckTo');
+const bankCheckRunBtn = document.getElementById('bankCheckRunBtn');
+const bankCheckResults = document.getElementById('bankCheckResults');
+let bankCheckExcelRows = [];
+let bankCheckFileName = '';
+const BANK_CHECK_TOLERANCE_DAYS = 3;
 
 let globalCategories = ["Alimentación", "Ropa", "Ocio", "Comunidades", "Seguros", "Otros"]; // Fallback por defecto
 let bankImportDataRows = [];
@@ -475,7 +487,11 @@ async function commitBankImportToFirestore() {
     }
 
     const level0 = (bankImportLevel?.value || globalLevel0Input.value || 'MADRID').trim();
-    const bank = 'CAIXA';
+    const bank = bankImportBank?.value.trim().toUpperCase() || '';
+    if (!bank) {
+        showCustomAlert('Indica el banco antes de volcar los movimientos.', 'error');
+        return;
+    }
 
     const confirmed = await showCustomConfirm(
         `Se van a guardar ${validRows.length} movimientos en Firestore.\n\nBanco: ${bank}\nZona: ${level0}\nCategoría: individual por fila\n\n¿Continuar?`
@@ -530,6 +546,191 @@ async function commitBankImportToFirestore() {
             bankImportSaveBtn.textContent = 'Volcar a Firestore';
         }
     }
+}
+
+// --- COMPROBAR MOVIMIENTOS (Excel del banco vs. movimientos de la app) ---
+function isoDayNumber(iso) {
+    const [y, m, d] = String(iso).split('-').map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function formatCheckDate(iso) {
+    const [y, m, d] = String(iso).split('-');
+    return `${d}/${m}/${y}`;
+}
+
+async function handleBankCheckFile(file) {
+    if (!file) return;
+    if (!window.XLSX) {
+        showCustomAlert('No se pudo cargar la librería Excel.', 'error');
+        return;
+    }
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const workbook = window.XLSX.read(buffer, { type: 'array', cellDates: true, raw: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheetRows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false, raw: true });
+
+        const { rows } = buildBankImportRows(sheetRows);
+        if (!rows.length) {
+            showCustomAlert('No hay movimientos válidos en el Excel.', 'error');
+            return;
+        }
+
+        // El importador devuelve el importe con signo de la app; aquí se usa el signo del banco.
+        bankCheckExcelRows = rows.map(row => ({
+            date: row.date,
+            concept: row.merchant,
+            amount: Number((-row.amount).toFixed(2))
+        }));
+        bankCheckFileName = file.name;
+
+        const dates = bankCheckExcelRows.map(r => r.date).sort();
+        if (bankCheckFrom) bankCheckFrom.value = dates[0];
+        if (bankCheckTo) bankCheckTo.value = dates[dates.length - 1];
+        if (bankCheckPanel) {
+            bankCheckPanel.style.display = 'block';
+            bankCheckPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        await runBankCheck();
+    } catch (error) {
+        console.error('Error comprobando movimientos:', error);
+        showCustomAlert(`Error leyendo fichero: ${error.message}`, 'error');
+    }
+}
+
+async function runBankCheck() {
+    if (!currentUser) {
+        showCustomAlert('Debes iniciar sesión para comprobar.', 'error');
+        return;
+    }
+    if (!bankCheckExcelRows.length) {
+        showCustomAlert('Primero selecciona un Excel.', 'error');
+        return;
+    }
+
+    const bank = (bankCheckBank?.value || '').trim().toUpperCase();
+    const from = bankCheckFrom?.value || '';
+    const to = bankCheckTo?.value || '';
+    if (from && to && from > to) {
+        showCustomAlert('La fecha "Desde" no puede ser posterior a "Hasta".', 'error');
+        return;
+    }
+
+    if (bankCheckRunBtn) {
+        bankCheckRunBtn.disabled = true;
+        bankCheckRunBtn.textContent = 'Comprobando...';
+    }
+
+    try {
+        const [expensesSnap, incomesSnap] = await Promise.all([
+            getDocs(query(collection(db, 'expenses'), where('uid', '==', currentUser.uid))),
+            getDocs(query(collection(db, 'incomes'), where('uid', '==', currentUser.uid)))
+        ]);
+
+        const inRange = date => (!from || date >= from) && (!to || date <= to);
+        const sameBank = data => !bank || String(data.bank || '').trim().toUpperCase() === bank;
+
+        // Signo del banco: gastos negativos, ingresos positivos.
+        const appMovements = [];
+        expensesSnap.forEach(snap => {
+            const data = snap.data();
+            if (!sameBank(data)) return;
+            const dates = [parseImportDate(data.paymentDate), parseImportDate(data.date)].filter(Boolean);
+            if (!dates.length) return;
+            appMovements.push({
+                dates, date: dates[0], kind: 'Gasto',
+                concept: [data.merchant, data.product].filter(Boolean).join(' - '),
+                amount: Number((-(parseFloat(data.amount) || 0)).toFixed(2)), used: false
+            });
+        });
+        incomesSnap.forEach(snap => {
+            const data = snap.data();
+            if (!sameBank(data)) return;
+            const date = parseImportDate(data.date);
+            if (!date) return;
+            appMovements.push({
+                dates: [date], date, kind: 'Ingreso',
+                concept: data.concept || '',
+                amount: Number((parseFloat(data.amount) || 0).toFixed(2)), used: false
+            });
+        });
+
+        const excelRows = bankCheckExcelRows.filter(row => inRange(row.date));
+        const matched = [];
+        const unmatchedExcel = [];
+
+        const findMatch = (row, maxDiff) => {
+            const rowDay = isoDayNumber(row.date);
+            let best = null;
+            let bestDiff = Infinity;
+            for (const mov of appMovements) {
+                if (mov.used || Math.abs(mov.amount - row.amount) > 0.005) continue;
+                const diff = Math.min(...mov.dates.map(d => Math.abs(isoDayNumber(d) - rowDay)));
+                if (diff <= maxDiff && diff < bestDiff) {
+                    best = mov;
+                    bestDiff = diff;
+                }
+            }
+            return best ? { mov: best, diff: bestDiff } : null;
+        };
+
+        const pending = [...excelRows];
+        [0, BANK_CHECK_TOLERANCE_DAYS].forEach(maxDiff => {
+            for (let i = pending.length - 1; i >= 0; i--) {
+                const found = findMatch(pending[i], maxDiff);
+                if (!found) continue;
+                found.mov.used = true;
+                matched.push({ row: pending[i], mov: found.mov, diff: found.diff });
+                pending.splice(i, 1);
+            }
+        });
+        unmatchedExcel.push(...pending);
+
+        const unmatchedApp = appMovements.filter(mov => !mov.used && inRange(mov.date));
+        renderBankCheckResults(matched, unmatchedExcel, unmatchedApp, bank);
+    } catch (error) {
+        console.error('Error en la comprobación:', error);
+        showCustomAlert(`Error al comprobar: ${error.message}`, 'error');
+    } finally {
+        if (bankCheckRunBtn) {
+            bankCheckRunBtn.disabled = false;
+            bankCheckRunBtn.textContent = 'Comprobar';
+        }
+    }
+}
+
+function renderBankCheckResults(matched, unmatchedExcel, unmatchedApp, bank) {
+    if (!bankCheckResults) return;
+
+    const euro = value => formatCurrency(value);
+    const section = (title, color, headers, rowsHtml) => `
+        <h4 style="margin: 18px 0 6px; color: ${color};">${title}</h4>
+        ${rowsHtml ? `<div style="overflow-x: auto;"><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+            : '<p class="import-empty">Ninguno.</p>'}`;
+
+    const excelRowsHtml = unmatchedExcel
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(r => `<tr><td>${formatCheckDate(r.date)}</td><td>${escapeHtml(r.concept)}</td><td>${euro(r.amount)}</td></tr>`).join('');
+
+    const appRowsHtml = unmatchedApp
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(m => `<tr><td>${formatCheckDate(m.date)}</td><td>${m.kind}</td><td>${escapeHtml(m.concept)}</td><td>${euro(m.amount)}</td></tr>`).join('');
+
+    const matchedRowsHtml = matched
+        .sort((a, b) => a.row.date.localeCompare(b.row.date))
+        .map(({ row, mov, diff }) => `<tr><td>${formatCheckDate(row.date)}</td><td>${escapeHtml(row.concept)}</td><td>${escapeHtml(mov.concept)}</td><td>${euro(row.amount)}</td><td>${diff === 0 ? 'Exacta' : `±${diff} día(s)`}</td></tr>`).join('');
+
+    if (bankCheckSummary) {
+        bankCheckSummary.textContent = `Fichero: ${bankCheckFileName} | Banco: ${bank || 'TODOS'} | Coinciden: ${matched.length} | Solo en banco: ${unmatchedExcel.length} | Solo en app: ${unmatchedApp.length}`;
+    }
+
+    bankCheckResults.innerHTML =
+        section('En el banco pero NO apuntados en la app', '#c0392b', ['Fecha', 'Movimiento', 'Importe'], excelRowsHtml) +
+        section('Apuntados en la app pero NO en el banco', '#d68910', ['Fecha', 'Tipo', 'Concepto', 'Importe'], appRowsHtml) +
+        section('Coinciden', '#1e8449', ['Fecha banco', 'Movimiento banco', 'Concepto app', 'Importe', 'Fecha'], matchedRowsHtml);
 }
 
 // Función para cargar configuración desde Firebase
@@ -683,6 +884,18 @@ if (bankImportClearBtn) {
 
 if (bankImportSaveBtn) {
     bankImportSaveBtn.addEventListener('click', commitBankImportToFirestore);
+}
+
+if (bankCheckInput) {
+    bankCheckInput.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (file) await handleBankCheckFile(file);
+        event.target.value = '';
+    });
+}
+
+if (bankCheckRunBtn) {
+    bankCheckRunBtn.addEventListener('click', runBankCheck);
 }
 
 // Función para guardar datos (Simulación BD)
