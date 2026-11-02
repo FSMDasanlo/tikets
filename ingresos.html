@@ -88,6 +88,7 @@
             <div class="header-actions" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
                 <button id="btnViewDetail" class="btn-nav active"><i class="fa-solid fa-list-ul"></i> Detalle</button>
                 <button id="btnViewByConcept" class="btn-nav"><i class="fa-solid fa-layer-group"></i> Conceptos</button>
+                <button id="btnOpenBalances" class="btn-nav"><i class="fa-solid fa-scale-balanced"></i> Saldo Actual</button>
             </div>
 
             <div id="monthlyBalancePanel" hidden style="margin-top: 20px;">
@@ -155,6 +156,29 @@
             <div id="transferSummary" style="margin-top:20px; padding: 15px; border-radius: 8px; background-color: #e9ecef; display: none; text-align: center;">
                 <!-- Se mostrará el resumen antes de confirmar -->
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Saldo Actual -->
+    <div id="balancesModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px; width: 95%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #17a2b8; padding-bottom: 10px;">
+                <h2 style="margin: 0; color: #17a2b8;"><i class="fa-solid fa-scale-balanced"></i> Saldo Actual por Banco</h2>
+                <button id="closeBalancesBtn" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            <p style="margin: 0 0 12px; color: #666;">Ingresos menos gastos registrados hasta hoy.</p>
+            <table style="width: 100%;">
+                <thead>
+                    <tr><th>Banco</th><th style="text-align: right;">Saldo</th></tr>
+                </thead>
+                <tbody id="balancesBody"></tbody>
+                <tfoot>
+                    <tr>
+                        <th>TOTAL LÍQUIDO</th>
+                        <th id="balancesTotal" style="text-align: right;"></th>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
     </div>
 

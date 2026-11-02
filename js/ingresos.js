@@ -301,6 +301,77 @@ const bankCardsContainer = document.getElementById("bankCardsContainer");
 const transferAmount = document.getElementById("transferAmount");
 const transferDate = document.getElementById("transferDate");
 
+// --- SALDO ACTUAL POR BANCO ---
+const balancesModal = document.getElementById("balancesModal");
+const btnOpenBalances = document.getElementById("btnOpenBalances");
+const closeBalancesBtn = document.getElementById("closeBalancesBtn");
+const balancesBody = document.getElementById("balancesBody");
+const balancesTotal = document.getElementById("balancesTotal");
+
+async function showCurrentBalances() {
+  if (!currentUser) return;
+  balancesBody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Calculando...</td></tr>';
+  balancesTotal.textContent = "";
+  balancesModal.style.display = "flex";
+  setTimeout(() => balancesModal.classList.add("show"), 10);
+
+  try {
+    const [incomesSnap, expensesSnap] = await Promise.all([
+      getDocs(query(collection(db, "incomes"), where("uid", "==", currentUser.uid))),
+      getDocs(query(collection(db, "expenses"), where("uid", "==", currentUser.uid))),
+    ]);
+    const today = new Date().toISOString().split("T")[0];
+    const totals = {};
+    const add = (bank, amount) => {
+      const key = (bank || "SIN BANCO").trim().toUpperCase();
+      totals[key] = (totals[key] || 0) + amount;
+    };
+    incomesSnap.forEach((d) => {
+      const i = d.data();
+      if (i.date && i.date > today) return;
+      add(i.bank, parseFloat(i.amount) || 0);
+    });
+    expensesSnap.forEach((d) => {
+      const e = d.data();
+      const date = e.paymentDate || e.date;
+      if (date && date > today) return;
+      add(e.bank, -(parseFloat(e.amount) || 0));
+    });
+
+    const entries = Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]));
+    let total = 0;
+    balancesBody.innerHTML = "";
+    entries.forEach(([bank, amount]) => {
+      total += amount;
+      const tr = document.createElement("tr");
+      const tdBank = document.createElement("td");
+      tdBank.textContent = bank;
+      const tdAmount = document.createElement("td");
+      tdAmount.style.textAlign = "right";
+      tdAmount.style.color = amount < 0 ? "#dc3545" : "#28a745";
+      tdAmount.textContent = formatCurrency(amount);
+      tr.append(tdBank, tdAmount);
+      balancesBody.appendChild(tr);
+    });
+    if (!entries.length) {
+      balancesBody.innerHTML = '<tr><td colspan="2" style="text-align:center;">Sin movimientos.</td></tr>';
+    }
+    balancesTotal.textContent = formatCurrency(total);
+    balancesTotal.style.color = total < 0 ? "#dc3545" : "#28a745";
+  } catch (error) {
+    console.error("Error calculando saldos:", error);
+    balancesBody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#dc3545;">Error al calcular los saldos.</td></tr>';
+  }
+}
+
+if (btnOpenBalances) btnOpenBalances.addEventListener("click", showCurrentBalances);
+if (closeBalancesBtn) {
+  closeBalancesBtn.addEventListener("click", () => {
+    balancesModal.classList.remove("show");
+    setTimeout(() => (balancesModal.style.display = "none"), 300);
+  });
+}
+
 // Autenticación
 onAuthStateChanged(auth, (user) => {
   if (user) {
